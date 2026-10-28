@@ -1,0 +1,40 @@
+name: DSH-TuZi publish qualified Windows preview
+on:
+  workflow_dispatch:
+    inputs:
+      qualification_run_id:
+        description: Successful community Windows qualification run ID
+        required: true
+        type: string
+      release_tag:
+        description: New community preview tag (existing tags are not overwritten)
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: community-publish-windows
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'AiW520/DSH-TuZi' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
+      - name: Publication guard regressions
+        run: node --test community/tests/publish-windows.mjs
+      - name: Verify qualification and publish the exact installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUALIFICATION_RUN_ID: ${{ inputs.qualification_run_id }}
+          COMMUNITY_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: node community/scripts/publish-windows.mjs
