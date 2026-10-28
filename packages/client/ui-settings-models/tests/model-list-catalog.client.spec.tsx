@@ -8,6 +8,34 @@ import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
+it('writes detected input types for a hand-entered custom model', async () => {
+  const onChange = vi.fn()
+  const discover = vi.fn<ModelsOperations['discoverModels']>().mockResolvedValue({
+    kind: 'found', models: [{ id: 'vision', inputModalities: ['text', 'image'] }],
+  })
+  render(<ModelListEditor
+    models={[{ id: 'vision' }]} onChange={onChange}
+    probe={{ settingsNs: 'llm-pi-ai', baseURL: 'https://example.test/v1', api: 'openai-completions' }}
+    operations={operations(discover)} t={key => en[key]} disabled={false} onBusyChange={() => {}}
+  />)
+  fireEvent.blur(screen.getByLabelText(`${en.modelId} 1`))
+  await waitFor(() => { expect(onChange).toHaveBeenCalledWith([{ id: 'vision', input: ['text', 'image'] }]) })
+})
+
+it('does not overwrite a user input choice while identification is pending', async () => {
+  const pending = Promise.withResolvers<ModelDiscoveryOutcome>()
+  const onChange = vi.fn()
+  const props = {
+    onChange, probe: { settingsNs: 'llm-pi-ai', baseURL: 'https://example.test/v1' },
+    operations: operations(() => pending.promise), t: (key: keyof typeof en) => en[key], disabled: false, onBusyChange: () => {},
+  }
+  const view = render(<ModelListEditor {...props} models={[{ id: 'vision' }]} />)
+  fireEvent.blur(screen.getByLabelText(`${en.modelId} 1`))
+  view.rerender(<ModelListEditor {...props} models={[{ id: 'vision', input: ['text'] }]} />)
+  await act(async () => { pending.resolve({ kind: 'found', models: [{ id: 'vision', inputModalities: ['text', 'image'] }] }) })
+  expect(onChange).not.toHaveBeenCalled()
+})
+
 function operations(discoverModels: ModelsOperations['discoverModels']): ModelsOperations {
   return {
     discoverModels,
@@ -16,6 +44,20 @@ function operations(discoverModels: ModelsOperations['discoverModels']): ModelsO
     writeSettings: vi.fn(),
   }
 }
+
+it('discards manual identification after the endpoint changes', async () => {
+  const pending = Promise.withResolvers<ModelDiscoveryOutcome>()
+  const onChange = vi.fn()
+  const props = {
+    models: [{ id: 'vision' }], onChange,
+    operations: operations(() => pending.promise), t: (key: keyof typeof en) => en[key], disabled: false, onBusyChange: () => {},
+  }
+  const view = render(<ModelListEditor {...props} probe={{ settingsNs: 'llm-pi-ai', baseURL: 'https://first.test/v1' }} />)
+  fireEvent.blur(screen.getByLabelText(`${en.modelId} 1`))
+  view.rerender(<ModelListEditor {...props} probe={{ settingsNs: 'llm-pi-ai', baseURL: 'https://second.test/v1' }} />)
+  await act(async () => { pending.resolve({ kind: 'found', models: [{ id: 'vision', inputModalities: ['text', 'image'] }] }) })
+  expect(onChange).not.toHaveBeenCalled()
+})
 
 it('ignores a late catalog response after the provider changes', async () => {
   const oldCatalog = Promise.withResolvers<ModelDiscoveryOutcome>()

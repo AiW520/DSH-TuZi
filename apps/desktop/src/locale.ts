@@ -1,4 +1,5 @@
 /** Typed shell copy for every shipped language owned by the Electron shell. */
+import { COMMUNITY_DESKTOP, DESKTOP_BRAND } from './community-brand.ts'
 
 export const en = {
   cliCommandMenu: 'Manage dsh Command…',
@@ -1390,9 +1391,15 @@ export function resolveDesktopLocale(locale: string): DesktopLocale {
   const primary = locale.toLowerCase().split('-')[0]
   if (primary !== undefined && Object.hasOwn(dictionaries, primary)) {
     const id = primary as keyof typeof dictionaries
-    return { id: id === 'zh' ? 'zh-CN' : id, messages: dictionaries[id] }
+    return { id: id === 'zh' ? 'zh-CN' : id, messages: brandedMessages(dictionaries[id]) }
   }
-  return { id: 'en', messages: en }
+  return { id: 'en', messages: brandedMessages(en) }
+}
+
+function brandedMessages(messages: DesktopMessages): DesktopMessages {
+  if (!COMMUNITY_DESKTOP) return messages
+  return Object.fromEntries(Object.entries(messages).map(([key, value]) =>
+    [key, value.replaceAll('DeepSeek Harness', DESKTOP_BRAND.name)])) as DesktopMessages
 }
 
 /**

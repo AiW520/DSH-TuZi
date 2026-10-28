@@ -4,6 +4,8 @@ import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
 
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { homedir } from 'node:os'
+import { COMMUNITY_DESKTOP, DESKTOP_BRAND } from './community-brand.ts'
 import { fileURLToPath } from 'node:url'
 import {
   app,
@@ -84,6 +86,16 @@ const rendererConsole = new RendererConsoleTail()
 
 // Platform-conventional logs directory (macOS ~/Library/Logs/<name>, otherwise under userData);
 // set before ready so the first fatal report already resolves under it.
+if (COMMUNITY_DESKTOP) {
+  app.setName(DESKTOP_BRAND.name)
+  // Preserve an explicit test/user override, and isolate the normal installation.
+  if (!app.commandLine.hasSwitch('user-data-dir')) app.setPath('userData', join(app.getPath('appData'), DESKTOP_BRAND.name))
+  process.env.DSH_HOME = process.env.DSH_TUZI_HOME?.trim() || join(homedir(), DESKTOP_BRAND.home)
+  process.env.DSH_TELEMETRY_DISABLED = '1'
+  process.env.DSH_TUZI_COMMUNITY = '1'
+  process.env.DSH_PET_ELECTRON_PATH = process.execPath
+  process.env.DSH_TUZI_PET_RUNTIME = join(process.resourcesPath, 'runtime', 'community-pet')
+}
 app.setAppLogsPath()
 
 function currentDesktopLocale(): ReturnType<typeof resolveDesktopLocale> {
@@ -962,7 +974,7 @@ async function main(): Promise<void> {
   const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
     : join(process.resourcesPath, 'icon.png')
   app.setAboutPanelOptions({
-    applicationName: 'DeepSeek Harness',
+    applicationName: DESKTOP_BRAND.name,
     applicationVersion: app.getVersion(),
     // The release has no separate build number; omit Electron's bundle version.
     version: '',
@@ -990,7 +1002,7 @@ async function main(): Promise<void> {
       : { label: currentDesktopLocale().messages.aboutMenu, role: 'about' },
     { type: 'separator' },
     { label: currentDesktopLocale().messages.checkUpdatesMenu, click: () => { void openUpdatePrompt(true) } },
-    ...process.platform === 'darwin' || process.platform === 'win32'
+    ...!COMMUNITY_DESKTOP && (process.platform === 'darwin' || process.platform === 'win32')
       ? [{ label: currentDesktopLocale().messages.cliCommandMenu, click: () => { void commandManager.show() } }] : [],
     ...development ? [
       { type: 'separator' as const },
@@ -1262,10 +1274,10 @@ async function main(): Promise<void> {
     window.focus()
   }
 
-  if (app.isPackaged || process.env.DSH_DESKTOP_DEV_APP === '1') app.setAsDefaultProtocolClient('dsh')
+  if (app.isPackaged || process.env.DSH_DESKTOP_DEV_APP === '1') app.setAsDefaultProtocolClient(DESKTOP_BRAND.protocol)
   app.on('open-url', (event, url) => {
     event.preventDefault()
-    if (url === 'dsh://open' || url === 'dsh://open/') focusPrimaryWindow()
+    if (url === `${DESKTOP_BRAND.protocol}://open` || url === `${DESKTOP_BRAND.protocol}://open/`) focusPrimaryWindow()
   })
 
   app.on('activate', (_event, hasVisibleWindows) => {

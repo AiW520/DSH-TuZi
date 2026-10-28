@@ -32,9 +32,15 @@ export async function downloadPrimaryRuntimeAsset(url: string, sha256: string, c
     cached = false
     const timeout = Number(process.env.DSH_RESOURCE_DOWNLOAD_TIMEOUT_MS ?? '300000')
     if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 2_147_483_647) throw new Error('DSH_RESOURCE_DOWNLOAD_TIMEOUT_MS must be an integer from 1 to 2147483647')
-    const response = await fetch(url, { signal: AbortSignal.timeout(timeout) })
-    if (!response.ok) throw new Error(`primary runtime download: ${String(response.status)} ${url}`)
-    bytes = Buffer.from(await response.arrayBuffer())
+    const asset = new URL(url).pathname.split('/').at(-1) ?? 'runtime archive'
+    console.info(`primary runtime: downloading ${asset}`)
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(timeout) })
+      if (!response.ok) throw new Error(`HTTP ${String(response.status)}`)
+      bytes = Buffer.from(await response.arrayBuffer())
+    } catch (error) {
+      throw new Error(`primary runtime: failed to download ${asset} from ${new URL(url).origin}; retry with a reachable network or populate the checksum-verified download cache`, { cause: error })
+    }
   }
   if (createHash(algorithm).update(bytes).digest('hex') !== sha256) {
     rmSync(destination, { force: true })

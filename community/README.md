@@ -1,0 +1,27 @@
+# DSH-TuZi community edition
+
+English | [中文](README.zh.md)
+
+DSH-TuZi is an independent community distribution based on DeepSeek Harness. It is not an official release from DeepSeek or TuZi. Upstream copyright and license notices remain in place.
+
+The community build uses the `DSH-TuZi` application name, application identifier `io.github.aiw520.dsh-tuzi`, `dsh-tuzi://open` protocol and `~/.dsh-tuzi` data directory. Set `DSH_TUZI_HOME` to an absolute directory for isolated testing. An inherited `DSH_HOME` does not redirect the community desktop into an upstream installation. Electron settings are stored under the `DSH-TuZi` application-support directory; `--user-data-dir` can override this for tests. The upstream `dsh` command installer is hidden in the community shell to avoid replacing an existing CLI.
+
+Build an Apple Silicon test package from the repository root:
+
+```sh
+DSH_TUZI_COMMUNITY=1 pnpm run package:desktop:mac:arm64:unsigned
+```
+
+This command produces an ad-hoc-signed test application, not an Apple-notarized public release. It disables automatic updates and mandatory-update policy. Public releases require separate signing credentials, a community-owned update endpoint and installation qualification. No credentials belong in this directory, source control, build artifacts or the download page.
+
+Model capability detection preserves explicit provider metadata, reads exact unambiguous installed catalog entries, and uses TuZi's public descriptions where available. Text/image capabilities are retained when a directory also declares audio or video. Manual declarations win over detected suggestions. Responses from a previous endpoint are discarded. Unknown aliases still require a manual selection or an explicit real request; model names alone cannot establish a gateway's supported request format.
+
+The default pi-ai stream idle allowance is ten minutes with up to eight transient-error retries. This is not a guarantee against gateway disconnects. Real delayed-response, interruption, cancellation and tool-execution qualification is required before announcing provider stability.
+
+The community shell disables session telemetry and upstream product analytics. The build carries the community title through both local and signed packaging profiles.
+
+The [cloud-bunny adapter](pet/README.md) reuses MIT code from dsh-pet with separate artwork. It is loaded as a normal optional profile bundle and shares the installed Electron runtime. Removing the bundle persists across restarts; native recovery also disables it. The separate `dsh-tuzi-brand` bundle supplies sidebar and conversation branding through the existing slots.
+
+Run `node community/tests/desktop-acceptance.mjs /absolute/path/to/DSH-TuZi` against an installed executable to test actual Harness sessions, tool execution, pet states and cancellation using a local mock provider. This is application integration evidence, not real-provider evidence. The [preview qualification](release-notes/README.md) separates those results.
+
+The `site/` directory contains the standalone download page. Publish only artifacts that have completed qualification. The page reads `releases.json`; an empty release list visibly disables downloads. Each published entry needs platform, architecture, version, HTTPS artifact URL, byte size, SHA-256 and signing status.

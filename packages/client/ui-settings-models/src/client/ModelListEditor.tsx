@@ -18,7 +18,7 @@
  * rows the user can still fill in by hand.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { LlmDiscoveredModel } from '@deepseek-ai/dsh-api-remotes/client'
 import { AnimatedRows, Button, IconPlusOutlineRegular, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -155,6 +155,12 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
   const { models, onChange, probe, operations, t, disabled, onBusyChange } = props
   const { catalogProvider } = props
   const [busy, setBusy] = useState(false)
+  const latestModels = useRef(models)
+  latestModels.current = models
+  const latestProbe = useRef(probe)
+  latestProbe.current = probe
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   useEffect(() => { onBusyChange(busy) }, [busy, onBusyChange])
   const [failure, setFailure] = useState<string | undefined>(undefined)
   const [inheritedCatalog, setInheritedCatalog] = useState<{
@@ -232,6 +238,35 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
       setCandidates([...new Map(found.map(model => [model.id, model])).values()])
     } finally {
       setBusy(false)
+    }
+  }
+
+  // A hand-entered id gets the same endpoint-backed suggestion as a picked
+  // model. A user declaration always wins, including one made while awaiting.
+  const identifyManualModel = async (index: number, id: string): Promise<void> => {
+    const row = models.at(index)
+    if (disabled || props.probeBlocked !== undefined || catalogProvider !== undefined || id.length === 0 || busy || !probe.baseURL || row === undefined || row['input'] !== undefined) return
+    setBusy(true)
+    try {
+      const answer = await operations.discoverModels(probe.settingsNs, {
+        ...probe.provider === undefined ? {} : { provider: probe.provider },
+        baseURL: probe.baseURL,
+        ...probe.api === undefined ? {} : { api: probe.api },
+        ...probe.apiKey === undefined ? {} : { apiKey: probe.apiKey },
+      })
+      if (!mounted.current || answer.kind !== 'found') return
+      const currentProbe = latestProbe.current
+      if (currentProbe.settingsNs !== probe.settingsNs || currentProbe.provider !== probe.provider
+        || currentProbe.baseURL !== probe.baseURL || currentProbe.api !== probe.api || currentProbe.apiKey !== probe.apiKey) return
+      const input = answer.models.find(candidate => candidate.id === id)?.inputModalities
+      const current = latestModels.current
+      const currentRow = current.at(index)
+      if (input === undefined || currentRow === undefined || currentRow['id'] !== id || currentRow['input'] !== undefined) return
+      onChange(current.map((model, at) => at === index ? { ...model, input: [...input] } : model))
+    } catch {
+      // Discovery is advisory; an unavailable endpoint must not block hand entry.
+    } finally {
+      if (mounted.current) setBusy(false)
     }
   }
 
@@ -370,6 +405,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
               onChange: (text) => { editCapacity(index, 'maxTokens', text) },
             }}
             onFieldChange={(field, value) => { patch(index, { [field]: value }) }}
+            onIdBlur={(id) => { void identifyManualModel(index, id) }}
             onChange={(next) => { onChange(models.map((row, at) => at === index ? next : row)) }}
             onToggle={() => { rowState.toggle(index) }}
             onRemove={() => {

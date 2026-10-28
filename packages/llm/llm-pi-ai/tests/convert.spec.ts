@@ -898,6 +898,12 @@ describe('mapStopReason / mapUsage', () => {
   })
 
   it('maps routable HTTP-ish error messages to stable codes', () => {
+    expect(mapStopReason(assistant({
+      stopReason: 'error',
+      errorMessage: '403 {"error":{"code":"service_capacity_unavailable"}}',
+    }))).toMatchObject({ kind: 'error', failure: { code: 'SERVER' } })
+    expect(mapStopReason(assistant({ stopReason: 'error', errorMessage: 'HTTP 403: forbidden' })))
+      .toMatchObject({ kind: 'error', failure: { code: 'AUTH' } })
     expect(mapStopReason(assistant({ stopReason: 'error', errorMessage: 'HTTP 401: bad key' })))
       .toMatchObject({ kind: 'error', failure: { code: 'AUTH' } })
     expect(mapStopReason(assistant({ stopReason: 'error', errorMessage: 'HTTP 429: rate limit' })))

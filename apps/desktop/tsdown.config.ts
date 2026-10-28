@@ -30,9 +30,17 @@ const clientVersion = clientEnvironment.DSH_CLIENT_VERSION
 if (clientVersion === undefined) throw new Error('desktop build: the client environment carries no DSH_CLIENT_VERSION')
 
 /** Inline the one public build value the Node entry reads; every other variable stays a runtime lookup. */
-const clientVersionDefine = { 'process.env.DSH_CLIENT_VERSION': JSON.stringify(clientVersion) }
+const communityDefine = { 'process.env.DSH_CLIENT_COMMUNITY': JSON.stringify(process.env.DSH_TUZI_COMMUNITY ?? '0') }
+const clientVersionDefine = { 'process.env.DSH_CLIENT_VERSION': JSON.stringify(clientVersion), ...communityDefine }
 
 export default defineConfig([
+  {
+    entry: ['lib/types/community-entry.js'],
+    outDir: 'lib', format: ['esm'], platform: 'node', target: 'es2024',
+    fixedExtension: false, dts: false, clean: false,
+    // Keep the normal shell as the already built sibling main.js entry.
+    deps: { neverBundle: ['electron', './main.js'] },
+  },
   {
     entry: ['lib/types/command-manager-entry.js'],
     plugins: [packagedImportsPlugin({ packages: new Set(), nodeBuiltins: true })],
@@ -67,7 +75,7 @@ export default defineConfig([
         }],
         root: fileURLToPath(new URL('.', import.meta.url)),
         esbuild: { jsx: 'automatic' },
-        define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+        define: { 'process.env.NODE_ENV': JSON.stringify('production'), ...communityDefine },
         build: {
           outDir: 'lib/welcome',
           emptyOutDir: true,
@@ -93,6 +101,7 @@ export default defineConfig([
   ...(['preload-app', 'preload-welcome', 'preload-platform-account', 'preload-mandatory', 'preload-update-dialog'] as const).map(name => ({
     // Sandboxed Electron preloads run as CommonJS even though the application package is ESM.
     entry: { [name]: `lib/types/${name}.js` },
+    define: communityDefine,
     plugins: [packagedImportsPlugin(preloadImports)],
     outDir: 'lib',
     format: 'cjs' as const,

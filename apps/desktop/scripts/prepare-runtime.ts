@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { downloadArtifact } from '@electron/get'
 import extractZip from 'extract-zip'
+import sharp from 'sharp'
 import { readPrimaryRuntime } from '../../../packages/skill/tool-workspace-dependencies/src/index.ts'
 import { desktopTargetPlatform, resolveDesktopBuildTarget, resolveDesktopTargetBuildPaths } from './desktop-build-paths.mjs'
 import { packagingStep } from './packaging-step.mjs'
@@ -53,6 +54,10 @@ async function main(): Promise<void> {
   const target = desktopTargetPlatform(resolveDesktopBuildTarget())
   rmSync(RUNTIME_ROOT, { recursive: true, force: true })
   mkdirSync(RUNTIME_ROOT, { recursive: true })
+  if (process.env.DSH_TUZI_COMMUNITY === '1') {
+    await sharp(join(import.meta.dirname, '..', 'resources', 'community-mark.svg'))
+      .png().toFile(join(RUNTIME_ROOT, 'community-icon.png'))
+  }
   const preparePrimary = () => packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'prepare:primary-runtime',
     () => preparePrimaryRuntime({ deferSmoke: values['defer-primary-runtime-smoke'] }))
   let nodeVersion: string

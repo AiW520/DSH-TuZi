@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { resolveDesktopPaths } from '../src/paths.ts'
-import { DesktopProjectManager } from '../src/project-manager.ts'
+import { createPluginProfile, DesktopProjectManager } from '../src/project-manager.ts'
 import { readProfilePlugins } from '@deepseek-ai/dsh-app-boot'
 import { runtimeFixture } from './runtime-fixture.ts'
 
@@ -43,6 +43,19 @@ afterEach(() => {
 })
 
 describe('desktop external plugin profile', () => {
+  it('adds the community pet only at first initialization and preserves its removal', () => {
+    const root = temporaryRoot()
+    createPluginProfile(root, true)
+    const path = join(root, 'package.json')
+    const manifest = JSON.parse(readFileSync(path, 'utf8'))
+    expect(manifest.dsh.profile.bundles).toContain('dsh-tuzi-pet')
+    expect(manifest.dsh.profile.bundles).toContain('dsh-tuzi-brand')
+    manifest.dsh.profile.bundles = manifest.dsh.profile.bundles.filter((name: string) => name !== 'dsh-tuzi-pet')
+    writeFileSync(path, JSON.stringify(manifest))
+    createPluginProfile(root, true)
+    expect(JSON.parse(readFileSync(path, 'utf8')).dsh.profile.bundles).not.toContain('dsh-tuzi-pet')
+  })
+
   it('preserves installed packages, profile state, and the lockfile when preparing a launch', async () => {
     const { manager } = setup()
     await manager.applyRelease()

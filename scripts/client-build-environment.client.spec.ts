@@ -97,6 +97,15 @@ describe('client build environment', () => {
     }).toThrow(/DSH_CLIENT_UNDECLARED/)
   })
 
+  it.each(['local', 'official'])('retains community identity through the %s packaging profile', (profile) => {
+    const fixtureRoot = repositoryFixture()
+    const repository = repositoryClientBuildEnvironment(fixtureRoot, { DSH_TUZI_COMMUNITY: '1' })
+    expect(repository.DSH_CLIENT_COMMUNITY).toBe('1')
+    expect(resolveClientBuildEnvironment(repository, profile)).toMatchObject({
+      DSH_CLIENT_COMMUNITY: '1', DSH_CLIENT_TITLE: 'DSH-TuZi', DSH_CLIENT_BUILD_PROFILE: 'community',
+    })
+  })
+
   it('inherits public values by default and isolates an explicit official profile', () => {
     const parent = {
       PATH: '/bin',

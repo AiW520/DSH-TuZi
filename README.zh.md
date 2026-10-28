@@ -1,5 +1,7 @@
 # DeepSeek Harness
 
+> **DSH-TuZi 社区版：** 本仓库开发基于 DeepSeek Harness 的独立发行版。请先阅读[社区版构建与验收说明](community/README.zh.md)。本项目不是 DeepSeek 或 TuZi 官方发行版。下文保留上游文档及许可信息。
+
 [English](README.md) | 中文
 
 DeepSeek Harness（`dsh`）是由 [DeepSeek AI](https://deepseek.com) 开发的开源 agent harness（智能体框架）。

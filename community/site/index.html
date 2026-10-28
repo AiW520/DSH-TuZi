@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="DSH-TuZi 独立社区版。连接你的模型，把想法变成作品。基于 DeepSeek Harness 构建。">
+  <meta name="theme-color" content="#f4f8f3">
+  <title>DSH-TuZi — 给想法一个开始</title>
+  <link rel="icon" type="image/svg+xml" href="mark.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="nav wrap">
+    <a class="wordmark" href="#" aria-label="DSH-TuZi 首页"><img src="mark.svg" width="38" height="38" alt="">DSH<span>—</span>TuZi</a>
+    <nav aria-label="主导航"><a href="#features">为什么选择</a><a href="#download">下载</a><a href="https://github.com/AiW520/DSH-TuZi" rel="noopener noreferrer">开源仓库 <span aria-hidden="true">↗</span></a></nav>
+  </header>
+  <main>
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <div class="hero-copy"><p class="eyebrow"><span class="dot"></span> 为你的工作方式，留一点自由</p>
+        <h1 id="hero-title">给想法<br>一个<span class="accent">开始。</span></h1>
+        <p class="intro">连接你选择的模型，读懂图片、编写代码、完成任务。<br class="desktop-only">让好用的 AI，成为桌面上的日常。</p>
+        <div class="hero-actions"><a class="button primary" href="#download">选择你的版本 <span aria-hidden="true">↓</span></a><a class="text-link" href="#features">了解社区版 <span aria-hidden="true">↗</span></a></div>
+        <p class="quiet">独立社区项目 · 基于 DeepSeek Harness 构建</p>
+      </div>
+      <div class="hero-art" aria-label="DSH-TuZi 云朵兔品牌插画">
+        <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+        <span class="floating-note note-top"><span aria-hidden="true">✳</span> 从一个小想法开始</span>
+        <img class="bunny" src="mark.svg" width="420" height="420" alt="薄荷绿色背景上的白色云朵兔">
+        <span class="floating-note note-bottom">慢慢想，认真做 <span aria-hidden="true">↗</span></span>
+        <span class="art-caption">A LITTLE SPACE FOR BIG IDEAS</span>
+      </div>
+    </section>
+    <div class="strip"><div class="wrap"><span>你的模型</span><b aria-hidden="true">✳</b><span>你的工作空间</span><b aria-hidden="true">✳</b><span>你的创作节奏</span></div></div>
+    <section class="features wrap" id="features" aria-labelledby="feature-title">
+      <div class="section-heading"><p class="eyebrow">MADE FOR YOUR EVERYDAY</p><h2 id="feature-title">少一点配置的绕路。<br>多一点动手的时间。</h2></div>
+      <div class="cards">
+        <article class="card"><span class="card-number">01 / CONNECT</span><div class="mini-models" aria-hidden="true"><span>GPT</span><span>Claude</span><span>你的模型 +</span></div><h3>选择适合的模型</h3><p>保留自定义供应商与协议选择，改进 TuZi 兼容路径。具体模型能力以供应商实际开放的接口为准。</p></article>
+        <article class="card"><span class="card-number">02 / UNDERSTAND</span><div class="mini-image" aria-hidden="true"><span>▧</span><i>图片输入 ✓</i></div><h3>图片能力，少猜一步</h3><p>从模型目录和明确的能力信息提供默认建议，保留手动调整。未知模型会留给你确认。</p></article>
+        <article class="card"><span class="card-number">03 / FOCUS</span><div class="mini-wait" aria-hidden="true"><span></span><span></span><span></span><i>给思考一点时间</i></div><h3>为慢一点的回答留余地</h3><p>延长流式等待时间，增加临时错误重试。实际连接体验仍取决于模型与服务商线路。</p></article>
+      </div>
+    </section>
+    <section class="download wrap" id="download" aria-labelledby="download-title">
+      <div class="download-intro"><p class="eyebrow">YOUR NEXT CHAPTER</p><h2 id="download-title">下一步，<br>从桌面开始。</h2><p>每个可下载版本都会标明平台、签名状态和文件校验值。<br>选择与你的设备匹配的安装包。</p></div>
+      <div class="release-panel"><div class="release-head"><span>获取 DSH-TuZi</span><span class="badge" id="release-status">验收进行中</span></div>
+        <div id="release-list" aria-live="polite"><p class="release-empty">完整社区版正在构建与验收。通过验证的安装包会在这里提供。</p><button class="button unavailable" type="button" disabled>安装包尚未发布</button></div>
+        <p class="release-foot">系统要求、安装说明和已知限制随版本提供。</p>
+      </div>
+    </section>
+    <section class="about wrap" id="about"><span class="eyebrow">BUILT IN THE OPEN</span><h2>由社区延续，<br>为日常打磨。</h2><p>DSH-TuZi 基于 DeepSeek Harness 构建，聚焦自定义模型、连接体验与桌面使用。它是独立社区版，与 DeepSeek、TuZi 官方没有隶属或背书关系。</p><p class="quiet">云朵兔已接入真实任务状态，支持思考、工作、等待、完成和错误反馈。首版面向 macOS Apple Silicon；其他平台与 Claude 真实通道仍待验收。</p></section>
+  </main>
+  <footer class="wrap"><a class="wordmark" href="#">DSH<span>—</span>TuZi</a><p>Made for curious minds.</p><span>保留上游开源许可与版权声明</span></footer>
+  <script src="releases.js" defer></script>
+</body>
+</html>

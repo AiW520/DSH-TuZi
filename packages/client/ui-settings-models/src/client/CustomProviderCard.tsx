@@ -314,7 +314,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
       <EditorFooter
         t={t}
         busy={busy}
-        submitDisabled={disabled || !ready}
+        submitDisabled={disabled || listBusy || !ready}
         submitLabelKey="create"
         submitBusyLabelKey="creating"
         onCancel={() => { props.onClose(committed) }}

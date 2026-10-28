@@ -127,6 +127,7 @@ export function repositoryClientBuildEnvironment(
   const dirty = repositoryGitDirty(root)
   return {
     ...inherited,
+    ...(environment.DSH_TUZI_COMMUNITY === '1' ? { DSH_CLIENT_COMMUNITY: '1', DSH_CLIENT_TITLE: 'DSH-TuZi' } : {}),
     DSH_CLIENT_COMMIT_HASH: repositoryCommitHash(root, environment),
     ...(dirty === true ? { DSH_CLIENT_GIT_DIRTY: 'true' } : {}),
     DSH_CLIENT_VERSION: repositoryVersion(root),
@@ -208,6 +209,8 @@ export function resolveClientBuildEnvironment(
         DSH_CLIENT_BUILD_PROFILE: 'local',
         ...(environment.DSH_CLIENT_GIT_DIRTY === 'true' ? { DSH_CLIENT_GIT_DIRTY: 'true' } : {}),
       }),
+      ...(environment.DSH_TUZI_COMMUNITY === '1' || environment.DSH_CLIENT_COMMUNITY === '1'
+        ? { DSH_CLIENT_COMMUNITY: '1', DSH_CLIENT_TITLE: 'DSH-TuZi', DSH_CLIENT_BUILD_PROFILE: 'community' } : {}),
     }
   }
   throw new Error(`unknown client build profile ${JSON.stringify(profile)}; expected "official" or "local"`)

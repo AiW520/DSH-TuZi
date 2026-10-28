@@ -1,0 +1,41 @@
+name: DSH-TuZi qualification build
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: community-build-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  macos:
+    if: github.repository == 'AiW520/DSH-TuZi'
+    runs-on: macos-14
+    timeout-minutes: 90
+    env:
+      DSH_TUZI_COMMUNITY: '1'
+      DSH_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v5.0.0
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Model and desktop regressions
+        run: pnpm exec vitest run packages/llm/llm-pi-ai/tests/discovery.spec.ts packages/llm/llm-pi-ai/tests/adapter.spec.ts packages/client/ui-settings-models/tests/model-list-catalog.client.spec.tsx apps/desktop/tests/community-package.spec.ts apps/desktop/tests/project-manager.spec.ts scripts/client-build-environment.client.spec.ts packages/bundle/web-app/tests/product-analytics.spec.ts
+      - name: Build unsigned Apple Silicon qualification package
+        run: pnpm run package:desktop:mac:arm64:unsigned
+      - name: Record artifact checksum
+        run: shasum -a 256 apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts/*.dmg > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: dsh-tuzi-macos-arm64-qualification
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts/*.dmg
+            SHA256SUMS.txt

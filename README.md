@@ -1,5 +1,7 @@
 # DeepSeek Harness
 
+> **DSH-TuZi community edition:** this repository develops an independent distribution of DeepSeek Harness. See the [community build and qualification notes](community/README.md). It is not an official DeepSeek or TuZi release. Upstream documentation and licenses follow below.
+
 English | [中文](README.zh.md)
 
 DeepSeek Harness (`dsh`) is an open-source agent harness developed by [DeepSeek AI](https://deepseek.com).

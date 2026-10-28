@@ -44,7 +44,9 @@ import type {
 import { buildProvider, supportedProtocols } from './provider.ts'
 
 /** Default maximum idle interval while an adapter stream read is outstanding. */
-export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000
+export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 600_000
+/** Default maximum retries for transient model request failures. */
+export const DEFAULT_PROVIDER_MAX_RETRIES = 8
 
 /**
  * Default request-level bound on base64-encoded image payload. Every image in
@@ -178,7 +180,7 @@ export interface PiAiProviderProfile {
    * the smallest quality-ladder output is used when no quality fits.
    */
   requestImageMaxBytes?: number
-  /** Provider-owned model-request retry policy; omission uses normal mode with five retries. */
+  /** Provider-owned model-request retry policy; omission uses normal mode with eight retries. */
   retryPolicy?: RetryPolicyConfig
 }
 
@@ -497,7 +499,7 @@ export function resolveProfiles(
       maxRequestImageBytes,
       requestImagePixelBudget,
       requestImageMaxBytes,
-      retryPolicy: resolveRetryPolicy(retryPolicy, `llm-pi-ai: provider "${provider}" retryPolicy`),
+      retryPolicy: resolveRetryPolicy(retryPolicy ?? { mode: 'normal', maxRetries: DEFAULT_PROVIDER_MAX_RETRIES }, `llm-pi-ai: provider "${provider}" retryPolicy`),
       ...rest.headers === undefined ? {} : { headers: { ...rest.headers } },
       ...rest.thinkingBudgets === undefined ? {} : { thinkingBudgets: { ...rest.thinkingBudgets } },
       configuredMaxTokens: catalog?.configuredMaxTokens ?? new Map(),

@@ -25,7 +25,7 @@
 import { INVALID_CREDENTIAL_CODE, LlmError, normalizeApiKey } from '@deepseek-ai/dsh-llm'
 import type { LlmDiscoveredModel, LlmModelDiscoveryOperation } from '@deepseek-ai/dsh-llm'
 import { attributionHeaders } from '@deepseek-ai/dsh-llm'
-import { catalogModels } from './catalog.ts'
+import { catalogModels, catalogProviderIds } from './catalog.ts'
 
 /**
  * Protocols whose model listing this module can read. OpenAI protocols use
@@ -85,6 +85,61 @@ interface ListingEntry {
   maxTokens?: unknown
   limit?: ListingLimit | null
   top_provider?: ListingTopProvider | null
+  input_modalities?: unknown
+  architecture?: { input_modalities?: unknown } | null
+}
+
+/** Exact catalog ids only; conflicting catalog declarations remain unknown. */
+function catalogInputs(): Map<string, readonly ('text' | 'image')[] | undefined> {
+  const inputs = new Map<string, readonly ('text' | 'image')[] | undefined>()
+  for (const provider of catalogProviderIds()) {
+    for (const model of catalogModels(provider).values()) {
+      const input = [...model.input].sort()
+      const previous = inputs.get(model.id)
+      if (!inputs.has(model.id)) inputs.set(model.id, input)
+      else if (previous !== undefined && previous.join(',') !== input.join(',')) inputs.set(model.id, undefined)
+    }
+  }
+  return inputs
+}
+
+function listedInput(value: unknown): ('text' | 'image')[] | undefined {
+  if (!Array.isArray(value) || !value.every(item => typeof item === 'string')) return undefined
+  const supported = value.filter((item): item is 'text' | 'image' => item === 'text' || item === 'image')
+  return supported.length === 0 ? undefined : [...new Set(supported)]
+}
+
+/** TuZi's public descriptions sometimes explicitly disclose image input; tags alone do not. */
+function tuziInputs(body: unknown): Set<string> {
+  const result = new Set<string>()
+  const data = (body as { data?: unknown } | null)?.data
+  if (!Array.isArray(data)) return result
+  for (const value of data as unknown[]) {
+    if (value === null || typeof value !== 'object') continue
+    const row = value as { model_name?: unknown; description?: unknown }
+    if (typeof row.model_name !== 'string' || typeof row.description !== 'string') continue
+    if (/(?<!不)支持文本[与和及、]图[片像]输入/.test(row.description)) {
+      result.add(row.model_name)
+    }
+  }
+  return result
+}
+
+/** Best-effort public metadata, without forwarding the user's credential. */
+async function tuziVisionModels(baseURL: string, signal: AbortSignal | undefined): Promise<Set<string>> {
+  let url: URL
+  try { url = new URL(baseURL) } catch { return new Set() }
+  if (url.protocol !== 'https:' || url.hostname !== 'api.tu-zi.com' || url.port !== '' || !/^\/v1\/?$/.test(url.pathname)) return new Set()
+  try {
+    const timeout = AbortSignal.timeout(6000)
+    const response = await fetch('https://api.tu-zi.com/api/pricing', {
+      signal: signal === undefined ? timeout : AbortSignal.any([signal, timeout]),
+    })
+    if (!response.ok) return new Set()
+    return tuziInputs(JSON.parse(await readBounded(response, 'TuZi public model catalog')))
+  } catch {
+    return new Set()
+  }
 }
 
 /** A positive integer field of a listing entry, or `undefined` when absent or unusable. */
@@ -178,7 +233,7 @@ async function readBounded(response: Response, url: string): Promise<string> {
  * a working endpoint's catalog. Missing names fall back to the adopted id so
  * the Web form receives a complete human-readable row.
  */
-function readListing(body: unknown): LlmDiscoveredModel[] {
+function readListing(body: unknown, visionModels: ReadonlySet<string>): LlmDiscoveredModel[] {
   const listing = body as { data?: unknown; models?: unknown } | null
   const data = listing?.data
   let listed: { readonly key?: string; readonly raw: unknown }[]
@@ -199,6 +254,7 @@ function readListing(body: unknown): LlmDiscoveredModel[] {
       .map(([key, raw]) => ({ key, raw }))
   }
   const models: LlmDiscoveredModel[] = []
+  const knownInputs = catalogInputs()
   for (const { key, raw } of listed) {
     const entry = raw as ListingEntry | null
     const id = label(key, entry?.id)
@@ -219,11 +275,15 @@ function readListing(body: unknown): LlmDiscoveredModel[] {
       entry?.limit?.output,
       entry?.top_provider?.max_completion_tokens,
     )
+    const inputModalities = listedInput(entry?.input_modalities)
+      ?? listedInput(entry?.architecture?.input_modalities)
+      ?? (visionModels.has(id) ? ['text', 'image'] as const : knownInputs.get(id))
     models.push({
       id,
       name,
       ...contextWindow === undefined ? {} : { contextWindow },
       ...maxTokens === undefined ? {} : { maxTokens },
+      ...inputModalities === undefined ? {} : { inputModalities },
     })
   }
   return models
@@ -359,5 +419,7 @@ export async function discoverModels(
   } catch (error: unknown) {
     throw new LlmError(`${url} did not answer with JSON`, 'DISCOVERY_FAILED', { cause: error })
   }
-  return readListing(body)
+  const visionModels = await tuziVisionModels(request.baseURL, request.signal)
+  if (request.signal?.aborted) throw new LlmError('model discovery aborted by caller', 'ABORTED')
+  return readListing(body, visionModels)
 }

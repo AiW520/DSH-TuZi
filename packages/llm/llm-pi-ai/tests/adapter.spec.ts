@@ -389,6 +389,15 @@ describe('PiAiAdapter provider routing', () => {
     expect(server.paths).toEqual(['/chat/completions'])
   })
 
+  it('classifies TuZi capacity errors as transient even when returned as HTTP 403', async () => {
+    const server = await mockServer([{ status: 403, body: JSON.stringify({
+      error: { message: 'service unavailable', type: 'service_capacity_unavailable', code: 'service_capacity_unavailable' },
+    }) }])
+    const ctx = await harness(server.url)
+    const result = await assemble(ctx, { model: 'deepseek-flash', messages: [] })
+    expect(result.finish).toMatchObject({ kind: 'error', failure: { code: 'SERVER' } })
+  })
+
   it('uses the resolved catalog context window for usage-based overflow detection', async () => {
     const model = getBuiltinModels('deepseek').find(candidate => candidate.id === 'deepseek-flash')
     if (model === undefined) throw new Error('deepseek-flash missing from pi-ai test catalog')
@@ -478,7 +487,7 @@ describe('provider profile lifecycle', () => {
     })
     expect(ctx.llm.providerRetryPolicy('anthropic')).toMatchObject({
       mode: 'normal',
-      maxRetries: 5,
+      maxRetries: 8,
     })
     await fiber.dispose()
     expect(ctx.llm.listProviders()).toEqual([])
@@ -873,6 +882,21 @@ describe('provider profile lifecycle', () => {
     if (second.finish.kind !== 'error') throw new Error('expected an error finish')
     expect(second.finish.failure.message).toMatch(/provider route "deepseek".*PI_CUSTOM_REF_KEY/s)
     expect(server.requests).toHaveLength(0)
+  })
+
+  it('defaults long-running routes and preserves explicitly configured retry limits', () => {
+    const profiles = resolveProfiles({
+      openai: {},
+      anthropic: {},
+      gateway: { api: 'openai-completions', baseURL: 'https://example.test/v1', models: [{ id: 'custom' }] },
+      explicit: { api: 'anthropic-messages', baseURL: 'https://example.test', models: [{ id: 'custom' }], streamIdleTimeoutMs: 42_000, retryPolicy: { mode: 'normal', maxRetries: 2 } },
+    })
+    for (const route of ['openai', 'anthropic', 'gateway']) {
+      expect(profiles.get(route)?.streamIdleTimeoutMs).toBe(600_000)
+      expect(profiles.get(route)?.retryPolicy).toMatchObject({ mode: 'normal', maxRetries: 8 })
+    }
+    expect(profiles.get('explicit')?.streamIdleTimeoutMs).toBe(42_000)
+    expect(profiles.get('explicit')?.retryPolicy).toMatchObject({ mode: 'normal', maxRetries: 2 })
   })
 
   it('validates empty, underspecified, legacy-shaped, and explicitly blank profiles', () => {

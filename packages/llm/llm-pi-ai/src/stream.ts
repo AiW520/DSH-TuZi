@@ -40,6 +40,8 @@ export function mapUsage(usage: PiUsage): TokenUsage {
 // If pi-ai ever forwards the original Error (or a fetch/dispatcher hook that lets
 // us capture the cause ourselves), classify on `code`/`cause` instead of text.
 function classifyPiAiError(message: string): string {
+  // TuZi returns this temporary capacity condition with HTTP 403, not 5xx.
+  if (/\b403\b/.test(message) && /["']?code["']?\s*[:=]\s*["']?service_capacity_unavailable\b/i.test(message)) return 'SERVER'
   if (/\b(?:401|403)\b/.test(message)) return 'AUTH'
   if (isQuotaExceededError(message)) return QUOTA_EXCEEDED_CODE
   if (/\b429\b|rate.?limit/i.test(message)) return 'RATE_LIMIT'

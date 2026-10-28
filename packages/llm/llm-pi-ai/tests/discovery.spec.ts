@@ -115,6 +115,55 @@ describe('catalog-route model discovery', () => {
 })
 
 describe('draft-provider model discovery', () => {
+  it('uses declared input types and exact, unambiguous installed model ids', async () => {
+    const server = await listingServer({ body: JSON.stringify({ data: [
+      { id: 'gpt-6-astra' },
+      { id: 'gpt-6-astra-alias' },
+      { id: 'declared', architecture: { input_modalities: ['text', 'image'] } },
+      { id: 'gpt-6.1-sol', input_modalities: ['text'] },
+      { id: 'audio-capable', input_modalities: ['text', 'audio'] },
+      { id: 'multimodal', input_modalities: ['text', 'image', 'audio', 'video'] },
+      { id: 'invalid', input_modalities: ['image', 1] },
+    ] }) })
+    const models = await discoverModels({ baseURL: server.url })
+    expect(models.find(model => model.id === 'gpt-6-astra')?.inputModalities).toContain('image')
+    expect(models.find(model => model.id === 'gpt-6-astra-alias')?.inputModalities).toBeUndefined()
+    expect(models.find(model => model.id === 'declared')?.inputModalities).toEqual(['text', 'image'])
+    expect(models.find(model => model.id === 'gpt-6.1-sol')?.inputModalities).toEqual(['text'])
+    expect(models.find(model => model.id === 'invalid')?.inputModalities).toBeUndefined()
+    expect(models.find(model => model.id === 'audio-capable')?.inputModalities).toEqual(['text'])
+    expect(models.find(model => model.id === 'multimodal')?.inputModalities).toEqual(['text', 'image'])
+  })
+
+  it('uses TuZi public descriptions without forwarding credentials or trusting image tags', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [
+        { id: 'gpt-6.1-terra' }, { id: 'drawing-only' }, { id: 'negative' }, { id: 'explicit-text', input_modalities: ['text'] },
+      ] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [
+        { model_name: 'gpt-6.1-terra', description: '支持文本与图片输入、文本输出' },
+        { model_name: 'drawing-only', description: '支持图像生成', tags: '图像' },
+        { model_name: 'negative', description: '不支持文本和图片输入' },
+        { model_name: 'explicit-text', description: '支持文本和图像输入' },
+      ] })))
+    vi.stubGlobal('fetch', fetch)
+    const models = await discoverModels({ baseURL: 'https://api.tu-zi.com/v1', apiKey: 'test-key' })
+    expect(models.find(model => model.id === 'gpt-6.1-terra')?.inputModalities).toEqual(['text', 'image'])
+    expect(models.find(model => model.id === 'drawing-only')?.inputModalities).toBeUndefined()
+    expect(models.find(model => model.id === 'negative')?.inputModalities).toBeUndefined()
+    expect(models.find(model => model.id === 'explicit-text')?.inputModalities).toEqual(['text'])
+    expect(fetch.mock.calls[1]?.[0]).toBe('https://api.tu-zi.com/api/pricing')
+    expect(fetch.mock.calls[1]?.[1]?.headers).toBeUndefined()
+  })
+
+  it('keeps TuZi model discovery usable when its public catalog fails', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'unknown-model' }] })))
+      .mockRejectedValueOnce(new Error('unavailable')))
+    await expect(discoverModels({ baseURL: 'https://api.tu-zi.com/v1' }))
+      .resolves.toEqual([{ id: 'unknown-model', name: 'unknown-model' }])
+  })
+
   it('reads an OpenAI-compatible listing and keeps the capacities it discloses', async () => {
     const server = await listingServer({
       body: JSON.stringify({
@@ -504,10 +553,10 @@ const RECORDED_LISTINGS = [
     file: 'openrouter-2026-09-02.json',
     api: 'openai-completions',
     models: [
-      { id: 'anthropic/claude-fable-5.1', name: 'Anthropic: Claude Fable 5.1', contextWindow: 1_000_000, maxTokens: 128_000 },
+      { id: 'anthropic/claude-fable-5.1', name: 'Anthropic: Claude Fable 5.1', contextWindow: 1_000_000, maxTokens: 128_000, inputModalities: ['text', 'image'] },
       // The router's own aggregate route reports no completion cap.
-      { id: 'openrouter/auto-beta', name: 'Auto Router (Beta)', contextWindow: 2_000_000 },
-      { id: 'deepseek/deepseek-v4-flash', name: 'DeepSeek: DeepSeek V4 Flash 0423', contextWindow: 1_048_576, maxTokens: 384_000 },
+      { id: 'openrouter/auto-beta', name: 'Auto Router (Beta)', contextWindow: 2_000_000, inputModalities: ['text', 'image'] },
+      { id: 'deepseek/deepseek-v4-flash', name: 'DeepSeek: DeepSeek V4 Flash 0423', contextWindow: 1_048_576, maxTokens: 384_000, inputModalities: ['text'] },
     ],
   },
   {
@@ -515,9 +564,9 @@ const RECORDED_LISTINGS = [
     file: 'models-dev-anthropic-2026-09-02.json',
     api: 'openai-completions',
     models: [
-      { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', contextWindow: 1_000_000, maxTokens: 128_000 },
-      { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', contextWindow: 1_000_000, maxTokens: 128_000 },
-      { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5 (latest)', contextWindow: 200_000, maxTokens: 64_000 },
+      { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', contextWindow: 1_000_000, maxTokens: 128_000, inputModalities: ['image', 'text'] },
+      { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', contextWindow: 1_000_000, maxTokens: 128_000, inputModalities: ['image', 'text'] },
+      { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5 (latest)', contextWindow: 200_000, maxTokens: 64_000, inputModalities: ['image', 'text'] },
     ],
   },
   {
@@ -525,9 +574,9 @@ const RECORDED_LISTINGS = [
     file: 'deepseek-2026-09-02.json',
     api: 'openai-completions',
     models: [
-      { id: 'deepseek-v4-flash', name: 'deepseek-v4-flash' },
-      { id: 'deepseek-v4-pro', name: 'deepseek-v4-pro' },
-      { id: 'deepseek-v4-flash-vision-exp', name: 'deepseek-v4-flash-vision-exp' },
+      { id: 'deepseek-v4-flash', name: 'deepseek-v4-flash', inputModalities: ['text'] },
+      { id: 'deepseek-v4-pro', name: 'deepseek-v4-pro', inputModalities: ['text'] },
+      { id: 'deepseek-v4-flash-vision-exp', name: 'deepseek-v4-flash-vision-exp', inputModalities: ['image', 'text'] },
     ],
   },
   {
@@ -536,7 +585,7 @@ const RECORDED_LISTINGS = [
     api: 'anthropic-messages',
     // The reference example fills both capacities with 0, which is not a
     // usable capacity, so the row carries the name alone.
-    models: [{ id: 'claude-opus-5', name: 'Claude Opus 5' }],
+    models: [{ id: 'claude-opus-5', name: 'Claude Opus 5', inputModalities: ['image', 'text'] }],
   },
 ]
 
