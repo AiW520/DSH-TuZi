@@ -28,6 +28,6 @@ pi-ai 默认允许流式连接空闲十分钟，并对临时错误最多重试�
 
 下载页复用 `pet/assets/webm/` 中的六段动画，并在 `site/assets/` 中保存对应静态帧。更换桌宠素材时需同步这些副本。状态按钮仅供本地预览，不连接正在运行的 Harness 会话。动画在移出视口或页面隐藏时暂停，也可手动暂停；系统要求减少动态效果时默认显示静态图片。不支持视频播放时保留静态图片。
 
-社区验收工作流在原生 Windows runner 上构建 Windows x64 安装包。未签名预览版不包含上游强制更新策略。完成 NSIS 安装后，工作流依次运行安装后的 Harness 和桌宠测试，只有全部成功才生成安装包校验值与验收记录。在出现该记录之前，Windows 下载必须保持不可用。在临时 runner 上运行 `community/scripts/qualify-windows.ps1` 可重新执行安装验收。将 `DSH_COMMUNITY_EVIDENCE_DIR` 设为已有目录，可在其中保留隔离的测试记录；不设置时使用系统临时目录。
+社区验收工作流在原生 Windows runner 上构建 Windows x64 安装包。未签名预览版不包含上游强制更新策略。安装程序使用社区版名称与云朵兔图标。完成 NSIS 安装后，工作流依次运行安装后的 Harness 和桌宠测试，并验证卸载保留社区数据目录，只有全部成功才生成安装包校验值与验收记录。在出现该记录之前，Windows 下载必须保持不可用。在临时 runner 上运行 `community/scripts/qualify-windows.ps1` 可重新执行安装验收。将 `DSH_COMMUNITY_EVIDENCE_DIR` 设为已有目录，可在其中保留隔离的测试记录；不设置时使用系统临时目录。
 
 下载页识别操作系统，并支持手动选择系统与芯片。不会根据 Mac 浏览器标识猜测 Apple Silicon。缺少对应安装包时显示暂未发布，不将其他系统的安装包作为主下载按钮；手机与未知浏览器需要手动选择。`node community/tests/download-page.mjs` 使用 Playwright 检查这些状态；没有内置 Chromium 时，可设置 `DSH_TEST_BROWSER_CHANNEL=chrome` 使用已安装的 Chrome。

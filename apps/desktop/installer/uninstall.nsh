@@ -21,7 +21,11 @@ Function un.CleanData
     Return
   ${EndIf}
   ; Only a DSH_HOME published as a Windows environment variable is visible here.
-  ReadEnvStr $UnHome DSH_HOME
+  !ifdef DSH_COMMUNITY_INSTALLER
+    ReadEnvStr $UnHome DSH_TUZI_HOME
+  !else
+    ReadEnvStr $UnHome DSH_HOME
+  !endif
   ClearErrors
   StrCpy $UnTarget "$APPDATA\${PRODUCT_FILENAME}"
   Call un.RemoveData

@@ -77,7 +77,30 @@ foreach ($asset in @('brand', 'brand-2x', 'brand-dark', 'brand-dark-2x', 'uninst
             try {
                 $background = if ($asset -like '*dark*') { [Drawing.Color]::FromArgb(21, 21, 23) } else { [Drawing.Color]::White }
                 $graphics.Clear($background)
-                $graphics.DrawImage($image, 0, 0, $image.Width, $image.Height)
+                if ($env:DSH_TUZI_COMMUNITY -eq '1') {
+                    # Reuse the packaged bunny icon and render the community name at the template's native dimensions.
+                    $iconPath = Join-Path (Split-Path $output) 'runtime/community-icon.png'
+                    $icon = [Drawing.Image]::FromFile($iconPath)
+                    $scale = if ($asset -like '*2x') { 2 } else { 1 }
+                    $sidebar = $asset -eq 'uninstaller-sidebar'
+                    $iconSize = if ($sidebar) { 100 } else { 100 * $scale }
+                    $iconX = if ($sidebar) { 32 } else { 40 * $scale }
+                    $iconY = if ($sidebar) { 50 } else { 48 * $scale }
+                    $fontSize = if ($sidebar) { 17 } else { 30 * $scale }
+                    $font = [Drawing.Font]::new('Segoe UI', $fontSize, [Drawing.FontStyle]::Bold, [Drawing.GraphicsUnit]::Pixel)
+                    $color = if ($asset -like '*dark*') { [Drawing.Color]::FromArgb(225, 239, 223) } else { [Drawing.Color]::FromArgb(52, 79, 67) }
+                    $brush = [Drawing.SolidBrush]::new($color)
+                    try {
+                        $graphics.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+                        $graphics.TextRenderingHint = [Drawing.Text.TextRenderingHint]::AntiAliasGridFit
+                        $graphics.DrawImage($icon, $iconX, $iconY, $iconSize, $iconSize)
+                        $textX = if ($sidebar) { 35 } else { 165 * $scale }
+                        $textY = if ($sidebar) { 170 } else { 77 * $scale }
+                        $graphics.DrawString('DSH-TuZi', $font, $brush, $textX, $textY)
+                    } finally { $brush.Dispose(); $font.Dispose(); $icon.Dispose() }
+                } else {
+                    $graphics.DrawImage($image, 0, 0, $image.Width, $image.Height)
+                }
             } finally { $graphics.Dispose() }
             $bitmap.Save((Join-Path $output "$asset.bmp"), [Drawing.Imaging.ImageFormat]::Bmp)
         } finally { $bitmap.Dispose() }

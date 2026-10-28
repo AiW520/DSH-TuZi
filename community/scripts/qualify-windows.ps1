@@ -18,6 +18,16 @@ node community/tests/desktop-acceptance.mjs $executable
 if ($LASTEXITCODE -ne 0) { throw 'Installed Harness integration failed.' }
 node community/tests/desktop-pet-interactions.mjs $executable --installed
 if ($LASTEXITCODE -ne 0) { throw 'Installed desktop pet interactions failed.' }
+$uninstallers = @(Get-ChildItem -LiteralPath $destination -Filter 'Uninstall*.exe')
+if ($uninstallers.Count -ne 1) { throw 'Expected one installed uninstaller.' }
+$homeMarker = Join-Path $evidence 'preserved-home'
+New-Item -ItemType Directory -Force $homeMarker | Out-Null
+'keep user data' | Set-Content (Join-Path $homeMarker 'keep.txt')
+$env:DSH_TUZI_HOME = $homeMarker
+$uninstall = Start-Process -FilePath $uninstallers[0].FullName -ArgumentList @('/S', "_?=$destination") -PassThru
+if (-not $uninstall.WaitForExit(180000)) { Stop-Process -Id $uninstall.Id -Force; throw 'Uninstaller timed out.' }
+if ($uninstall.ExitCode -ne 0 -or (Test-Path -LiteralPath $executable)) { throw 'Uninstall did not remove the application.' }
+if (-not (Test-Path -LiteralPath (Join-Path $homeMarker 'keep.txt'))) { throw 'Uninstaller removed the protected community home.' }
 $hash = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
 "$hash  $($installer.Name)" | Set-Content -Encoding utf8 (Join-Path $artifacts 'SHA256SUMS.txt')
-@{ schemaVersion = 1; qualified = $true; platform = 'Windows'; arch = 'x64'; sourceCommit = $env:GITHUB_SHA; runId = $env:GITHUB_RUN_ID; artifact = $installer.Name; bytes = $installer.Length; sha256 = $hash; signing = 'unsigned-test'; tests = @('NSIS silent installation', 'installed Harness sessions and task states', 'installed desktop pet interactions') } | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 (Join-Path $artifacts 'qualification.json')
+@{ schemaVersion = 1; qualified = $true; platform = 'Windows'; arch = 'x64'; sourceCommit = $env:GITHUB_SHA; runId = $env:GITHUB_RUN_ID; artifact = $installer.Name; bytes = $installer.Length; sha256 = $hash; signing = 'unsigned-test'; tests = @('NSIS silent installation', 'installed Harness sessions and task states', 'installed desktop pet interactions', 'uninstall preserves community home') } | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 (Join-Path $artifacts 'qualification.json')

@@ -135,7 +135,10 @@ export function createElectronBuilderConfig(
         '-OutputDirectory', join(buildPaths.root, 'installer-ui')], {
         env: scrubWindowsSigningEnvironment(env), windowsHide: true,
       })
-      await writeFile(join(buildPaths.root, 'installer-ui', 'strings.nsh'), renderInstallerStrings(readInstallerLocales()), 'utf8')
+      const installerStrings = renderInstallerStrings(readInstallerLocales())
+      await writeFile(join(buildPaths.root, 'installer-ui', 'strings.nsh'), community
+        ? '!define DSH_COMMUNITY_INSTALLER\n' + installerStrings.replaceAll('DeepSeek Harness', brand.name)
+        : installerStrings, 'utf8')
       if (windowsSigner !== undefined) {
         await windowsSigner({ path: join(buildPaths.root, 'installer-ui', 'window-frame.dll'), hash: 'sha256', isNest: false })
       }
