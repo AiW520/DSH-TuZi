@@ -12,7 +12,7 @@ const manifest = JSON.parse(await readFile(resolve(root, 'releases.json'), 'utf8
 const output = resolve(process.argv[2] || '../outputs/DSH-TuZi-platform-downloads');
 await mkdir(output, { recursive: true });
 const mac = manifest.releases.find(entry => entry.platform === 'macOS');
-const windows = { ...mac, platform: 'Windows', arch: 'x64', url: 'https://github.com/AiW520/DSH-TuZi/releases/download/test/dsh-tuzi-test.exe' };
+const windows = manifest.releases.find(entry => entry.platform === 'Windows' && entry.arch === 'x64') || { ...mac, platform: 'Windows', arch: 'x64', url: 'https://github.com/AiW520/DSH-TuZi/releases/download/test/dsh-tuzi-test.exe' };
 assert.equal(detectPlatform({ userAgent: 'Windows NT 10.0; Win64; x64' }), 'Windows');
 assert.equal(detectPlatform({ userAgent: 'Mozilla Macintosh', platform: 'MacIntel', maxTouchPoints: 5 }), 'mobile');
 assert.equal(detectPlatform({ userAgent: 'Linux Android', platform: 'Linux' }), 'mobile');
@@ -58,6 +58,7 @@ try {
   assert.equal(await page.locator('#release-list a').count(), 1);
   assert.match(await page.locator('#release-list a').getAttribute('href'), /\.exe$/);
   assert.match(await page.locator('#release-list').textContent(), /未签名/);
+  await page.locator('.release-panel').screenshot({ path: resolve(output, 'windows-available.png') });
   await page.selectOption('#release-architecture', 'arm64');
   assert.equal(await page.locator('#release-list a').count(), 0);
   await page.selectOption('#release-system', 'Linux');

@@ -2,6 +2,16 @@
   "schemaVersion": 1,
   "releases": [
     {
+      "platform": "Windows",
+      "arch": "x64",
+      "version": "0.2.1-rc.3-community.3",
+      "bytes": 314765231,
+      "sha256": "9f836ccc79a7d9afb6a1b975ca4ea1a821d147f6832dcfef12c068924db19db4",
+      "signing": "unsigned-test",
+      "qualified": true,
+      "url": "https://github.com/AiW520/DSH-TuZi/releases/download/v0.2.1-rc.3-community.3/dsh-tuzi-0.2.1-rc.3-win-x64-unsigned.exe"
+    },
+    {
       "platform": "macOS",
       "arch": "arm64",
       "version": "0.2.1-rc.3-community.2",
