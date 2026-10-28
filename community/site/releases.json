@@ -1,4 +1,15 @@
 {
   "schemaVersion": 1,
-  "releases": []
+  "releases": [
+    {
+      "platform": "macOS",
+      "arch": "arm64",
+      "version": "0.2.1-rc.3-community.1",
+      "bytes": 268521791,
+      "sha256": "bb3f5e35010a4dd337c459e63145b85bf975b9124dfdaa17b4e903fff54648b1",
+      "signing": "unsigned-test",
+      "qualified": true,
+      "url": "https://github.com/AiW520/DSH-TuZi/releases/download/v0.2.1-rc.3-community.1/dsh-tuzi-0.2.1-rc.3-mac-arm64-unsigned.dmg"
+    }
+  ]
 }
