@@ -40,6 +40,12 @@
         height: calc(var(--pet-size, 462px) * 9 / 16);
         pointer-events: none;
       }
+      .pet-art { position: absolute; inset: 0; pointer-events: none; transform-origin: 50% 87%; }
+      .pet-blink { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: none; }
+      .pet-blink.is-blinking { display: block; }
+      .pet-art.has-blink video.pet-video { visibility: hidden; }
+      .pet-sprite[data-quiet="true"] video.pet-video { transition: none; }
+      .pet-hit:focus-visible { outline: 2px solid #789c83; outline-offset: 5px; border-radius: 35%; }
       video.pet-video {
         position: absolute;
         inset: 0;
@@ -263,6 +269,7 @@
          桌面端同模式拆分：constants（基础设施）→ sprite（宠物本体）→ events（事件联动）→ renderer（启动入口） -->
     <script src="./shared-core.js"></script>
     <script src="./constants.js"></script>
+    <script src="./companion.js"></script>
     <script src="./sprite.js"></script>
     <script src="./events.js"></script>
     <script src="./renderer.js"></script>

@@ -211,8 +211,10 @@ class PetSprite {
     this.tip.className = S.TOOLTIP_CLASS;
     this.tip.setAttribute('aria-hidden', 'true');
 
-    stage.appendChild(this.videoA);
-    stage.appendChild(this.videoB);
+    this.art = document.createElement('div');
+    this.art.className = 'pet-art';
+    this.art.append(this.videoA, this.videoB);
+    stage.appendChild(this.art);
     stage.appendChild(this.hit);
     this.el.appendChild(this.bubble);
     this.el.appendChild(this.tip);
@@ -223,6 +225,7 @@ class PetSprite {
     // 事件（与浏览器同一套：pointerdown/move、click、window pointerup/cancel）
     const ac = new AbortController();
     this.ac = ac;
+    this.companion = (this.pet.id === 'cloud-bunny' || this.assetRoot === 'cloud-bunny') ? new CloudBunnyCompanion(this) : null;
     // 级联菜单新增面板、聊天输入增长都可能在鼠标停住时发生，不能只等下一次 mousemove。
     this.inputRegionResize = new ResizeObserver(() => this.syncInputRegions());
     this.inputRegionElements = new Set();
@@ -296,6 +299,7 @@ class PetSprite {
 
   dispose() {
     this.ac.abort();
+    this.companion?.dispose();
     this.inputRegionMutation.disconnect();
     this.inputRegionResize.disconnect();
     this.inputRegionElements.clear();
@@ -491,6 +495,7 @@ class PetSprite {
   // 双缓冲切换（与浏览器同一套：前台 opacity 切换 + 降级视频清 handler 并停播，防残留 ended 雪崩）
   switchTo(next, nextOnce, playbackId, url) {
     if (!next) return;
+    this.companion?.cancelEffects();
     const pending = this.pending;
     if (pending && pending.anim === next && pending.once === nextOnce) {
       // 防重命中（单动画点击时目标=当前动画，不重播）：仍消费 Q 弹标记，压当前前台视频，
@@ -562,10 +567,17 @@ class PetSprite {
       this.pending = null;
       this.playback = playbackId || null;
       el.style.transform = this.facing === 'right' ? 'scaleX(-1)' : '';
-      el.play()
+      const staticOnly = this.companion && (this.companion.quiet || document.hidden);
+      const playback = staticOnly ? (el.pause(), Promise.resolve()) : el.play();
+      playback
         .then(() => {
           // 只有 play() 兑现才代表"确实开始出画"（loadeddata 只代表可解码）
-          if (playbackId) this.reportPlayback(playbackId, 'playing');
+          if (playbackId) {
+            if (staticOnly) {
+              this.playback = null;
+              this.reportPlayback(playbackId, 'failed', 'play-rejected');
+            } else this.reportPlayback(playbackId, 'playing');
+          }
         })
         .catch(() => {
           // 自动播放被拒 / 元素不可播：既有实现静默吞掉 → 现在如实回 failed（不改播放控制）
@@ -612,6 +624,7 @@ class PetSprite {
   applyFreeze(next) {
     if (this.frozen === next) return;
     this.frozen = next;
+    this.companion?.cancelEffects();
     const el = this.front === 0 ? this.videoA : this.videoB;
     const stamp = '[dsh-pet] ' + new Date().toTimeString().slice(0, 8) + ' pet=' + this.pet.id;
     if (next) {
@@ -1124,6 +1137,7 @@ class PetSprite {
    *  与浏览器同构，曲线在 shared（S.squashScale）。depth = 下压幅度（点击固定 0.55；
    *  落地按冲击速度 S.landingSquash 动态取）。reduce-motion 时跳过。 */
   startSquash(el, depth = S.SQ_SQUASH) {
+    if (this.companion?.quiet) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const token = ++this.squashToken;
     if (this.squashRef !== null) cancelAnimationFrame(this.squashRef);
@@ -1159,6 +1173,7 @@ class PetSprite {
   onPointerDown(e) {
     // 只认左键：右键进入拖拽判定会与右键菜单打架（右键不拖拽，两端一致）
     if (e.button !== 0) return;
+    this.companion?.cancelEffects();
     // 占用锁（issue #122 第 4 项）：用户**点了或拖了**这只宠物 = 用户接管，立刻撤掉第三方占用。
     // 这是唯一一处"渲染端 → 宿主"的锁上报——宿主看不见鼠标，而锁在它手里
     // （/lock/release 的 force 形态；桌面端走 bridge，与播放回执 reportPlayback 同一条路）。
@@ -1583,6 +1598,7 @@ class PetSprite {
     }
     this.stopThrow(); // 点击飞行中的宠物 = 收手停住（再播点击回应）
     this.stopMove();
+    if (this.companion) { this.companion.react('hop'); return; }
     if (!this.animations.clicks.length) return;
     this.pendingSquash = true; // 等新点击动画切到前台后 Q 弹（压新首帧，与浏览器一致）
     this.playOnce(S.pick(this.animations.clicks));
@@ -1620,6 +1636,7 @@ class PetSprite {
     const d = this.dragState;
     if (d.active || d.dragging || this.justDragged || this.menuOpen) return;
     e.preventDefault();
+    this.companion?.cancelEffects();
     this.stopThrow(); // 菜单弹出前停住飞行中的宠物
     this.stopMove(); // 菜单悬停期间宠物不漫游
     // 桌面专属工具根项（打开网站 / 查看余额 / 碎碎念 / 对话 / 回到初始位置 / 重载配置）+ 共享菜单树（动作→分类→具体动画）
@@ -1634,6 +1651,7 @@ class PetSprite {
     ];
     // 「查看余额」无条件显示（与浏览器端一致）：关了 balanceEnabled 的宠物也能点——手动请求不受开关限制
     //（该开关只关自动轮询与档位动画），点了一定给答复。
+    if (this.companion) tools.push(...this.companion.menuItems());
     tools.push({ label: '查看余额', action: 'show-balance' });
     tools.push(
       { label: '碎碎念', action: 'whisper' },
@@ -1682,6 +1700,7 @@ class PetSprite {
   onMenuAction(leaf, keepFacing) {
     this.closeMenu();
     if (!leaf || typeof leaf !== 'object') return;
+    if (this.companion?.handleMenu(leaf.action)) return;
     if (leaf.action === 'third-party') {
       // 第三方菜单项：只把 (owner, label) 交给宿主，具体做什么由注册方自己去查 /menu/events。
       // 带上本窗口的宠物 id——同一条菜单项在不同宠物上被点，注册方要能分辨是哪只。

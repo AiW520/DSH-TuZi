@@ -22,6 +22,7 @@ PetSprite.prototype.onWorkTick = function onWorkTick(snapshot, tick) {
   // 别的宠物（issue #122 要的是"只控制指定 main"），所以按宠物在渲染端忽略。
   if (this.frozen) return;
   const state = snapshot && snapshot.state ? snapshot.state : null;
+  this.companion?.onTaskChange();
   this.workState = state; // 当前工作状态：互动/事件动画播完恢复档位循环用（与浏览器 workStatusRef 同用途）
   const stateChanged = this.prevWorkState !== state;
   this.prevWorkState = state;
@@ -44,6 +45,7 @@ PetSprite.prototype.onWorkTick = function onWorkTick(snapshot, tick) {
     this.workOn = false;
     this.workText = null;
     this.renderBubble();
+    if (this.companion?.quiet) this.playIdle();
     return;
   }
   const pool = this.animations.events?.workStatus;
@@ -402,9 +404,11 @@ async function pollStateOnce() {
     stateLongPoll = typeof s.counter === 'number';
     if (stateLongPoll) stateSince = s.counter;
     if (stateBaseline === null) {
-      stateBaseline = S.flattenCounters(s); // 首拉：只记基线，不渲染（避免启动/重载时重放旧气泡）
+      stateBaseline = S.flattenCounters(s); // 指令仅记基线，避免启动/重载时重放旧气泡。
       // 第三方菜单项是**当前状态**不是事件：首拉就要装上，否则 helper 重启后要等下次注册才出现
       applyMenuLeaf(s.sections ? s.sections.menu : null);
+      // 任务是当前状态：辅助窗口重启后立即恢复，不必等待下一个任务事件。
+      if (s.sections && s.sections.workStatus) applyWorkStatusLeaf(s.sections.workStatus);
       return true;
     }
     for (const change of S.takeChanged(s, stateBaseline)) {
