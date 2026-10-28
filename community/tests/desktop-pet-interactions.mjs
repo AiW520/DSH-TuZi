@@ -9,7 +9,7 @@ const { _electron } = createRequire(new URL('../../apps/web/package.json', impor
 const executablePath = process.argv[2];
 if (!executablePath) throw new Error('Pass an Electron executable, or an installed DSH-TuZi executable followed by --installed');
 const installed = process.argv.includes('--installed');
-const evidence = await mkdtemp(join(tmpdir(), 'dsh-pet-interactions-'));
+const evidence = await mkdtemp(join(process.env.DSH_COMMUNITY_EVIDENCE_DIR || tmpdir(), 'dsh-pet-interactions-'));
 const conf = JSON.parse(await readFile(new URL('../pet/assets/config.jsonc', import.meta.url), 'utf8'));
 conf.pets[0].position = { corner: 'bottom-left', marginX: 160, marginY: 180 };
 let counter = 1;

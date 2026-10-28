@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import assert from "node:assert/strict";
 const { _electron } = createRequire(new URL("../../apps/web/package.json", import.meta.url))("playwright");
 if (!process.argv[2]) throw new Error("Pass the absolute path to the installed DSH-TuZi executable");
-const root = await mkdtemp(join(tmpdir(), "dsh-tuzi-accept-"));
+const root = await mkdtemp(join(process.env.DSH_COMMUNITY_EVIDENCE_DIR || tmpdir(), "dsh-tuzi-accept-"));
 let n = 0;
 let phase = "success";
 const requests = [];
@@ -75,7 +75,7 @@ try {
   app.process().stdout.on("data", (b) => log += b);
   const page = await app.firstWindow();
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.waitForFunction(() => document.body.innerText.includes("新会话"), {}, { timeout: 6e4 });
+  await page.waitForFunction(() => /新会话|New session/i.test(document.body.innerText), {}, { timeout: 6e4 });
   assert.match(await page.locator("body").innerText(), /DSH-TuZi/);
   await page.addInitScript(() => {
     Object.defineProperty(globalThis, "__ModuleLoader__", { configurable: true, set(target) {

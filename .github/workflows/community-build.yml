@@ -1,6 +1,12 @@
 name: DSH-TuZi qualification build
 on:
   workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to build and qualify
+        type: choice
+        options: [windows, macos, all]
+        default: windows
 permissions:
   contents: read
 concurrency:
@@ -8,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   macos:
-    if: github.repository == 'AiW520/DSH-TuZi'
+    if: github.repository == 'AiW520/DSH-TuZi' && inputs.platform != 'windows'
     runs-on: macos-14
     timeout-minutes: 90
     env:
@@ -39,3 +45,65 @@ jobs:
           path: |
             apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts/*.dmg
             SHA256SUMS.txt
+  windows:
+    if: github.repository == 'AiW520/DSH-TuZi' && inputs.platform != 'macos'
+    runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      DSH_TUZI_COMMUNITY: '1'
+      DSH_TELEMETRY_DISABLED: '1'
+      DSH_RESOURCE_DOWNLOAD_TIMEOUT_MS: '90000'
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Enable long paths and native symlinks
+        run: |
+          git config --system core.longpaths true
+          reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v AllowDevelopmentWithoutDevLicense /d 1
+          reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /t REG_DWORD /f /v LongPathsEnabled /d 1
+      - uses: pnpm/action-setup@v5.0.0
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install pinned dependencies
+        timeout-minutes: 15
+        run: pnpm install --frozen-lockfile
+      - name: Community packaging regressions
+        run: pnpm exec vitest run apps/desktop/tests/community-package.spec.ts
+      - name: Configure unsigned community packaging
+        run: |
+          @'
+          DSH_DESKTOP_APP_ID=io.github.aiw520.dsh-tuzi
+          DSH_DESKTOP_WINDOWS_PACK_CONCURRENCY=4
+          DSH_DESKTOP_WINDOWS_COMPRESSION_LEVEL=3
+          '@ | Set-Content -Encoding utf8 apps/desktop/.env.windows
+      - name: Build Windows x64 NSIS installer
+        run: pnpm run package:desktop:win:x64:unsigned
+      - name: Install and qualify application and desktop pet
+        timeout-minutes: 15
+        run: ./community/scripts/qualify-windows.ps1
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: dsh-tuzi-windows-x64-qualified
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/*.exe
+            apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/SHA256SUMS.txt
+            apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/qualification.json
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: dsh-tuzi-windows-qualification-evidence
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            community-qualification/**/report.json
+            community-qualification/**/*.png
+            apps/desktop/.desktop-build/packaging-runs/**/result.json

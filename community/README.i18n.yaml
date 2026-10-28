@@ -3,5 +3,5 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write community/README.md
 /dsh-tuzi-community-edition:
-  en: 96460f9e260db80d
-  zh: b7f5cbb06af17209
+  en: 78268d689f9bc1d2
+  zh: 4f0a15e807c30540
