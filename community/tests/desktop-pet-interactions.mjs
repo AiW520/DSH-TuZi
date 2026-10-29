@@ -12,6 +12,8 @@ const installed = process.argv.includes('--installed');
 const evidence = await mkdtemp(join(process.env.DSH_COMMUNITY_EVIDENCE_DIR || tmpdir(), 'dsh-pet-interactions-'));
 const conf = JSON.parse(await readFile(new URL('../pet/assets/config.jsonc', import.meta.url), 'utf8'));
 conf.pets[0].position = { corner: 'bottom-left', marginX: 160, marginY: 180 };
+let companionSettings = { enabled: false, activity: 'balanced' };
+let companionDecision = null;
 let counter = 1;
 let work = { state: 'working', task: '正在验收桌宠互动' };
 const routes = [];
@@ -19,11 +21,13 @@ const server = createServer(async (req, res) => {
   const path = new URL(req.url, 'http://localhost').pathname;
   routes.push(path);
   const json = value => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(value)); };
+  if (path.endsWith('/companion')) return json({ settings: companionSettings, decision: companionDecision });
+  if (path.endsWith('/companion/chat')) { req.resume(); companionDecision = { id: 'desktop-chat', action: 'wave', mood: 'happy', text: '收到你的桌面聊天啦', expiresAt: Date.now()+15000 }; return json({ok:true}); }
   if (path.endsWith('/config')) return json({ main: conf });
   if (path.endsWith('/state')) return json({ sections: { menu: { counter: 0, data: [] }, workStatus: { counter, data: work } }, pets: {} });
   if (path.includes('/thumb/')) {
     const name = path.split('/').pop();
-    if (['idle','thinking','working','waiting','happy','error','drag'].some(s => name === s + '.webm')) {
+    if (['idle','thinking','working','waiting','happy','error','drag','nap','stretch','wave'].some(s => name === s + '.webm')) {
       try {
         res.setHeader('content-type', 'video/webm');
         res.end(await readFile(new URL('../pet/assets/webm/' + name, import.meta.url)));
@@ -49,6 +53,7 @@ try {
   });
   app.process().stderr.on('data', data => { log += data; });
   app.process().stdout.on('data', data => { log += data; });
+  await app.evaluate(({ powerMonitor }) => { powerMonitor.getSystemIdleTime = () => 0; });
   const page = await app.firstWindow();
   page.on('pageerror', error => errors.push(error.message));
   await page.waitForFunction(() => window.__dshPetDebug?.configOk && typeof sprites !== 'undefined' && sprites[0]?.companion?.ready, {}, { timeout: 20000 });
@@ -107,11 +112,49 @@ try {
   await setWork('waiting');
   assert.equal(await page.evaluate(() => sprites[0].whisperOn), false, 'a new task immediately replaces the local greeting');
   await setWork(null);
+  await page.waitForFunction(() => !sprites[0].pending);
+  for (const action of ['stretch', 'wave', 'nap', 'stroll', 'tilt']) {
+    assert.equal(await page.evaluate(action => sprites[0].companion.life.perform(action), action), true, action + ': ' + JSON.stringify(await page.evaluate(() => ({away:sprites[0].companion.life.away, paused:sprites[0].companion.life.presencePaused, canReact:sprites[0].companion.canReact(), move:sprites[0].moveRef, chat:sprites[0].chatOpen, work:sprites[0].workState}))));
+    if (['stretch','wave','nap'].includes(action)) {
+      await page.waitForFunction(action => !sprites[0].pending && sprites[0].motion.dataset.animation === action, action);
+      await page.screenshot({ path: join(evidence, 'life-' + action + '.png') });
+    } else assert.equal(await page.evaluate(() => !!sprites[0].companion.reaction), true);
+  }
+  await setWork('working');
+  assert.equal(await page.evaluate(() => sprites[0].companion.life.actionTimer), null, 'tasks cancel autonomous poses');
+  assert.equal(await page.evaluate(() => sprites[0].companion.life.perform('wave')), false, 'autonomy does not override tasks');
+  await setWork(null);
+  await page.waitForFunction(() => !sprites[0].pending);
+  await app.evaluate(({ powerMonitor }) => { powerMonitor.getSystemIdleTime = () => 301; });
+  await page.waitForFunction(() => sprites[0].companion.life.away && sprites[0].motion.dataset.animation === 'nap', {}, {timeout:12000});
+  await page.waitForFunction(() => sprites[0].companion.life.actionTimer === null, {}, {timeout:17000});
+  assert.equal(await page.evaluate(() => sprites[0].motion.dataset.animation), 'nap', 'remain asleep while user is away');
+  await app.evaluate(({ powerMonitor }) => { powerMonitor.getSystemIdleTime = () => 0; });
+  await page.waitForFunction(() => sprites[0].motion.dataset.animation === 'wave', {}, {timeout:12000});
+  await app.evaluate(({ powerMonitor }) => powerMonitor.emit('lock-screen'));
+  await page.waitForFunction(() => sprites[0].companion.life.presencePaused, {}, {timeout:12000});
+  assert.equal(await page.evaluate(() => sprites[0].companion.life.perform('hop')), false, 'lock screen pauses autonomy');
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll('video')].every(v=>v.paused)), true);
+  await app.evaluate(({ powerMonitor }) => powerMonitor.emit('unlock-screen'));
+  await page.waitForFunction(() => !sprites[0].companion.life.presencePaused, {}, {timeout:12000});
+  await page.evaluate(() => sprites[0].companion.life.consume({ id:'new-decision',action:'wave',mood:'happy',text:'AI动作测试',expiresAt:Date.now()+10000 }));
+  await page.waitForFunction(() => sprites[0].motion.dataset.animation === 'wave');
+  assert.equal(await page.evaluate(() => sprites[0].el.dataset.mood), 'happy');
+  await setWork('thinking'); await setWork(null);
+  await page.waitForFunction(() => !sprites[0].pending);
   await page.locator('.pet-hit').click({ button: 'right' });
   await page.getByText('减少动作', { exact: true }).click();
   assert.equal(await page.evaluate(() => sprites[0].companion.quiet), true);
   assert.equal(await page.evaluate(() => [...document.querySelectorAll('video')].every(v => v.paused)), true);
   assert.equal(await page.evaluate(() => sprites[0].motion.getAnimations().length), 0, 'reduced motion also stops CSS movement');
+  await page.locator('.pet-hit').click({ button: 'right' });
+  await page.getByText('对话', { exact:true }).click();
+  await page.locator('.dsh-pet-chat-input').fill('安静地聊一句');
+  await page.locator('.dsh-pet-chat-input').press('Enter');
+  await page.getByText('收到你的桌面聊天啦', {exact:true}).waitFor();
+  assert(routes.includes('/dsh-pet-7340/companion/chat'));
+  assert(!routes.includes('/dsh-pet-7340/chat'), 'desktop companion must use its own enabled flag and budget');
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll('video')].every(v=>v.paused)), true, 'quiet chat shows text without animation');
   await setWork('thinking');
   await page.waitForFunction(() => document.querySelector('.pet-video.is-front').currentSrc.endsWith('/thinking.webm'));
   assert.equal(await page.evaluate(() => document.querySelector('.pet-video.is-front').paused), true);
@@ -146,7 +189,7 @@ try {
     window.__disposedCompanion = { disposed: companion.disposed, idleTimer: companion.idleTimer, blinkTimer: companion.blinkTimer, reaction: companion.reaction };
   });
   assert.deepEqual(await page.evaluate(() => window.__disposedCompanion), { disposed: true, idleTimer: null, blinkTimer: null, reaction: null });
-  console.log('PASS desktop helper: current task on launch, click hop without changing task/position, natural and menu blink, menu hop, quiet persistence, quiet cancellation, keyboard, reduced motion, disposal.');
+  console.log('PASS desktop helper: current task on launch, click hop without changing task/position, natural and menu blink, menu hop, quiet persistence/chat, local poses, away/return, lock/unlock, task interruption, keyboard, reduced motion, disposal.');
 } finally {
   if (app) await app.close();
   server.closeAllConnections();

@@ -31,6 +31,8 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Check companion budget and cancellation
+        run: node --test community/tests/companion-service.mjs
       - name: Model and desktop regressions
         run: pnpm exec vitest run packages/llm/llm-pi-ai/tests/discovery.spec.ts packages/llm/llm-pi-ai/tests/adapter.spec.ts packages/client/ui-settings-models/tests/model-list-catalog.client.spec.tsx apps/desktop/tests/community-package.spec.ts apps/desktop/tests/project-manager.spec.ts scripts/client-build-environment.client.spec.ts packages/bundle/web-app/tests/product-analytics.spec.ts
       - name: Build unsigned Apple Silicon qualification package
@@ -74,6 +76,8 @@ jobs:
       - name: Install pinned dependencies
         timeout-minutes: 15
         run: pnpm install --frozen-lockfile
+      - name: Check companion budget and cancellation
+        run: node --test community/tests/companion-service.mjs
       - name: Community packaging regressions
         run: pnpm exec vitest run apps/desktop/tests/community-package.spec.ts
       - name: Configure unsigned community packaging

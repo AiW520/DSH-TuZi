@@ -105,6 +105,9 @@ import { listBalanceProviders, queryBalance, registerBalanceProvider } from './b
 import { generateWhisper } from './whisper';
 import { automaticWhisperSchedule } from './whisper-policy';
 import { generateChat, type ChatMemoryMessage } from './chat';
+import { CompanionService } from './companion-service.mjs';
+import { COMPANION_REASONS } from './companion-contract.mjs';
+import { generateCompanion } from './companion-llm';
 import { configuredModel } from './model-selection';
 import { limitPool, pickMeme, readMemePool } from './memes';
 import {
@@ -402,6 +405,14 @@ export function apply(ctx: any): void {
   const WORK_STATE_GAP_MS = 5000;
   /** 忙碌档：只有这两个档位之间的互切算"抖动"，其余档位变化一律立即写 */
   const isBusyTier = (s: string | null): boolean => s === 'working' || s === 'result';
+  const aiCompanion = new CompanionService({
+    file: join(userRoot, 'companion.json'),
+    generate: (input: Parameters<typeof generateCompanion>[1]) => generateCompanion(ctx, input),
+    environment: () => {
+      const bunny = flattenPetList(readAllConfig(configPaths)).find(p => p.id === 'cloud-bunny');
+      return { visible: bunny?.display === 'desktop' || bunny?.display === 'both', busy: !!workStatus.snapshot().state };
+    },
+  });
   let publishedWork = '\u0000';
   let publishedState: string | null = null;
   let publishedTask: string | null = null;
@@ -409,6 +420,7 @@ export function apply(ctx: any): void {
   let workFlushTimer: ReturnType<typeof setTimeout> | null = null;
   const publishWorkStatus = (): void => {
     const snap = workStatus.snapshot();
+    if (snap.state !== publishedState) aiCompanion.cancel();
     const key = String(snap.state) + '\u0000' + String(snap.task);
     if (key === publishedWork) return;
     // 抖动判定：文案没变、且前后都是忙碌档（同档已被上面的 key 短路掉，这里必是互切）
@@ -1123,6 +1135,7 @@ export function apply(ctx: any): void {
    */
   let desktopSyncQueue: Promise<void> = Promise.resolve();
   const syncDesktop = (): Promise<void> => {
+    aiCompanion.cancel();
     desktopSyncQueue = desktopSyncQueue
       .then(async () => {
         refreshDesktop();
@@ -1157,6 +1170,24 @@ export function apply(ctx: any): void {
   ): Promise<RouteResult> => {
     const url = new URL(rawUrl, 'http://localhost');
     const rest = decodeURIComponent(url.pathname.slice(ROUTE_PREFIX.length + 1));
+
+    if (rest === 'companion' || rest.startsWith('companion/')) {
+      try {
+        if (rest === 'companion' && method === 'GET') return { kind: 'json', status: 200, obj: await aiCompanion.get() };
+        if (rest === 'companion/memory' && method === 'DELETE') return { kind: 'json', status: 200, obj: await aiCompanion.clearMemory() };
+        if (rest === 'companion/cancel' && method === 'POST') { aiCompanion.cancel(); return { kind: 'json', status: 200, obj: { ok: true } }; }
+        if ((rest === 'companion' && method === 'PUT') || (['companion/think', 'companion/chat'].includes(rest) && method === 'POST')) {
+          if (!body || body.length > 8192) return { kind: 'json', status: 400, obj: { error: '请求内容过长或为空' } };
+          const input = JSON.parse(body);
+          const result = rest === 'companion' ? await aiCompanion.update(input) : await aiCompanion.think(rest === 'companion/chat' ? { trigger: 'chat', text: input.text } : input, signal);
+          if (rest === 'companion/chat' && !result.ok) return { kind: 'json', status: 200, obj: { ...result, message: COMPANION_REASONS[result.reason] ?? '暂时无法回应，请重试' } };
+          return { kind: 'json', status: 200, obj: result };
+        }
+        return { kind: 'json', status: 405, obj: { error: 'method not allowed' } };
+      } catch (error) {
+        return { kind: 'json', status: 400, obj: { error: error instanceof Error ? error.message : '陪伴请求失败，请重试' } };
+      }
+    }
 
     // 成品配置：/dsh-pet-7340/config（GET 读取合并成品 / PUT 保存用户层 / POST 同步内置默认）
     if (rest === 'config') {
@@ -2481,7 +2512,7 @@ export function apply(ctx: any): void {
         let min = Infinity;
         for (const pet of flattenPetList(cfg)) {
           const petId = String(pet.id ?? '');
-          if (!petId) continue;
+          if (!petId || petId === 'cloud-bunny') continue;
           // petId 就是从**同一份 cfg** 拍平出来的，所以必然命中（findPetInstance 与 flattenPetList
           // 搜索同一集合）；查不到只可能是两者口径漂移——跳过这一拍，**不猜也不兜底 main**。
           const found = findPetInstance(cfg, petId);
@@ -2613,6 +2644,7 @@ export function apply(ctx: any): void {
   // （回执的与 /state 长轮询的都不结束的话，插件重载会留下一批悬挂的响应，各自要等到超时才收尾）
   ctx.effect(() => () => {
     disposed = true;
+    aiCompanion.dispose();
     // 工作状态的补写定时器：卸载后它到点已经没有意义（叶子连同长轮询一起收尾），清掉免得挂着
     if (workFlushTimer !== null) {
       clearTimeout(workFlushTimer);

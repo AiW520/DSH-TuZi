@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { CompanionPanel } from './companion-panel.jsx'
 
 const labels = {
   zh: { name: '云朵兔', loading: '读取开关…', show: '开启桌面云朵兔', hide: '关闭桌面云朵兔', saving: '正在保存…', missing: '云朵兔未启用', failed: '无法读取开关，点击重试', saveFailed: '保存失败，请重试', on: '已开启', off: '已关闭' },
@@ -62,5 +63,6 @@ export function PetToggle({ wide }) {
       <span>{wide ? text.name : '🐰'}</span>{wide && <span>{busy ? text[phase] : on ? text.on : text.off}</span>}
     </button>
     {error && wide && <small role="status">{error}</small>}
+    <CompanionPanel />
   </div>
 }

@@ -45,7 +45,7 @@ try {
   );
   process.exit(3);
 }
-const { app, BrowserWindow, ipcMain, screen, shell, protocol, Tray, Menu, nativeImage } = electronApi;
+const { app, BrowserWindow, ipcMain, screen, shell, protocol, Tray, Menu, nativeImage, powerMonitor } = electronApi;
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { readFileSync, writeFileSync } = require('node:fs');
@@ -587,7 +587,7 @@ function bridgeRequest(method, url, body) {
       if (!p) return;
       bridgePending.delete(id);
       p.reject(new Error('bridge request timeout'));
-    }, 45000).unref?.();
+    }, ['/companion/think', '/companion/chat'].some(path => new URL(url, 'http://localhost').pathname.endsWith(path)) ? 70000 : 45000).unref?.();
   });
 }
 
@@ -759,6 +759,17 @@ async function startTray() {
 }
 
 app.whenReady().then(() => {
+  let locked = false, suspended = false;
+  const cancelCompanion = () => { hostRequest('POST', PET_ROUTE + '/companion/cancel', '{}').catch(() => {}); };
+  powerMonitor.on('lock-screen', () => { locked = true; cancelCompanion(); });
+  powerMonitor.on('unlock-screen', () => { locked = false; });
+  powerMonitor.on('suspend', () => { suspended = true; cancelCompanion(); });
+  powerMonitor.on('resume', () => { suspended = false; });
+  ipcMain.handle('pet:presence', () => {
+    try { return { idleSeconds: powerMonitor.getSystemIdleTime(), paused: locked || suspended }; }
+    catch { return { idleSeconds: 0, paused: true }; }
+  });
+
   // 探测子进程：此时没有 force-device-scale-factor，读到的是 Windows 的真实主屏缩放。
   // 退出推迟一拍——在 ready 回调里直接 app.exit() 会赶在 stdout 落盘前拆掉进程
   if (DPI_PROBE) {

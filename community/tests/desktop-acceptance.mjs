@@ -32,7 +32,7 @@ const server = createServer((req, res) => {
       timers.delete(timer);
       const useTodo = phase === "success" && call === 1 && data.tools?.some((t) => t.function?.name === "todo_write");
       const ask = phase === "waiting" && data.tools?.some((t) => t.function?.name === "ask_user_question");
-      const delta = ask ? { role: "assistant", tool_calls: [{ index: 0, id: "tuzi_accept_wait", type: "function", function: { name: "ask_user_question", arguments: JSON.stringify({ questions: [{ id: "accept", question: "Continue the qualification?", options: [{ label: "Continue" }, { label: "Cancel" }] }] }) } }] } : useTodo ? { role: "assistant", tool_calls: [{ index: 0, id: "tuzi_accept_todo", type: "function", function: { name: "todo_write", arguments: JSON.stringify({ todos: [{ content: "验证真实桌宠状态", status: "completed" }] }) } }] } : { role: "assistant", content: "Cloud bunny qualification passed." };
+      const delta = ask ? { role: "assistant", tool_calls: [{ index: 0, id: "tuzi_accept_wait", type: "function", function: { name: "ask_user_question", arguments: JSON.stringify({ questions: [{ id: "accept", question: "Continue the qualification?", options: [{ label: "Continue" }, { label: "Cancel" }] }] }) } }] } : useTodo ? { role: "assistant", tool_calls: [{ index: 0, id: "tuzi_accept_todo", type: "function", function: { name: "todo_write", arguments: JSON.stringify({ todos: [{ content: "验证真实桌宠状态", status: "completed" }] }) } }] } : { role: "assistant", content: data.messages?.some(m => m.role === 'system' && JSON.stringify(m.content).includes('只输出 JSON')) ? JSON.stringify({action:'wave',mood:'happy',text:'小林你好呀'}) : "Cloud bunny qualification passed." };
       res.write("data: " + JSON.stringify({ id: "qualification", object: "chat.completion.chunk", choices: [{ index: 0, delta, finish_reason: null }] }) + "\n\n");
       res.write("data: " + JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: useTodo || ask ? "tool_calls" : "stop" }], usage: { prompt_tokens: 10, completion_tokens: 8 } }) + "\n\ndata: [DONE]\n\n");
       res.end();
@@ -119,6 +119,29 @@ try {
   await page.getByRole('button', { name: /关闭桌面云朵兔|Hide desktop bunny/ }).waitFor();
   assert.equal(await visibility(), 'desktop', 'a hidden bunny must be recoverable from the main app');
   await page.waitForFunction(() => globalThis.__acceptCtx?.get('sessions'), {}, { timeout: 30000 });
+  await page.getByRole('button', { name: '陪伴设置与聊天' }).click();
+  await page.getByLabel('供应商', { exact:true }).selectOption('community-test');
+  await page.getByLabel('陪伴模型', { exact:true }).selectOption('community-test');
+  await page.getByLabel('开启 AI 陪伴').check();
+  await page.getByLabel('希望兔兔怎样称呼你').fill('小林');
+  await page.getByRole('button', { name:'保存设置', exact:true }).click();
+  await page.getByRole('status').filter({ hasText:'已保存' }).waitFor();
+  await page.getByLabel('和云朵兔说句话').fill('你好，挥挥手吧');
+  await page.getByRole('button', { name:'发送', exact:true }).click();
+  await page.getByLabel('陪伴聊天记录').getByText('小林你好呀', { exact:false }).waitFor({timeout:15000});
+  await page.screenshot({path:join(root, 'companion-chat.png')});
+  const readCompanion = async () => (await fetch(origin + '/dsh-pet-7340/companion', {headers:{cookie}})).json();
+  assert.equal((await readCompanion()).usage.calls,1);
+  await page.getByRole('button', {name:'立即关闭 AI',exact:true}).click();
+  await page.waitForFunction(() => !document.querySelector('dialog input[type=checkbox]').checked);
+  const disabled = await fetch(origin + '/dsh-pet-7340/companion/chat?pet=cloud-bunny&surface=desktop', {method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify({text:'不要调用模型'})});
+  assert.equal((await disabled.json()).reason,'disabled');
+  assert.equal((await readCompanion()).usage.calls,1);
+  await page.getByRole('button',{name:'清空记忆',exact:true}).click();
+  await page.getByRole('status').filter({hasText:'已清空'}).waitFor();
+  assert.equal((await readCompanion()).history.length,0);
+  await page.getByRole('button',{name:'关闭陪伴设置'}).click();
+  console.log('PASS installed companion settings, explicit provider, real adapter/mock response, memory, disabled desktop chat and budget');
   const getState = async () => {
     const response = await fetch(origin + "/dsh-pet-7340/state", { headers: { cookie } });
     if (!response.ok) throw new Error("pet state HTTP " + response.status);

@@ -86,7 +86,17 @@
       },
       "actions": []
     },
-    "categories": [],
+    "categories": [
+      {
+        "id": "日常生活",
+        "weight": 1,
+        "actions": [
+          "nap",
+          "stretch",
+          "wave"
+        ]
+      }
+    ],
     "events": {
       "balance": [
         "idle"

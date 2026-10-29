@@ -40,19 +40,21 @@ class CloudBunnyCompanion {
     this.preference.addEventListener('change', () => this.syncMotion(), { signal: sprite.ac.signal });
     document.addEventListener('visibilitychange', () => this.syncMotion(), { signal: sprite.ac.signal });
     this.syncMotion();
+    this.life = new CloudBunnyLife(this);
   }
 
-  get quiet() { return this.reduceMotion || this.preference.matches; }
+  get quiet() { return this.reduceMotion || this.preference.matches || this.life?.settings.activity === 'quiet'; }
 
   canReact() {
     const s = this.sprite;
-    return !this.disposed && !this.quiet && !document.hidden && !s.frozen &&
+    return !this.disposed && !this.quiet && !this.life?.presencePaused && !document.hidden && !s.frozen &&
       !s.dragState.active && s.throwRef === null && s.moveRef === null &&
       s.posFollow === null && !s.menuOpen && !s.chatOpen;
   }
 
   /** Cosmetic reactions are cancelled synchronously before dragging or changing task animation. */
   cancelEffects() {
+    this.life?.cancelVisual();
     clearTimeout(this.blinkTimer);
     this.blinkTimer = null;
     this.blinkImage.classList.remove('is-blinking');
@@ -96,6 +98,7 @@ class CloudBunnyCompanion {
 
   react(action) {
     if (this.disposed || this.sprite.dragState.active || this.sprite.frozen) return;
+    this.life?.touch();
     if (action === 'blink') this.blink();
     else this.hop();
     // User-triggered local greetings never cover a live task, error or approval bubble.
@@ -107,6 +110,7 @@ class CloudBunnyCompanion {
   }
 
   onTaskChange() {
+    this.life?.cancelRequest();
     this.cancelEffects();
     if (this.greetingView && this.sprite.whisperView === this.greetingView) this.sprite.clearWhisper();
     this.greetingView = null;
@@ -130,10 +134,11 @@ class CloudBunnyCompanion {
   syncMotion() {
     if (this.disposed) return;
     this.cancelEffects();
+    if (this.quiet || document.hidden || this.sprite.frozen || this.life?.presencePaused) this.life?.cancelRequest();
     this.sprite.el.dataset.quiet = String(this.quiet);
-    this.sprite.el.dataset.motionPaused = String(this.quiet || document.hidden || this.sprite.frozen);
+    this.sprite.el.dataset.motionPaused = String(this.quiet || document.hidden || this.sprite.frozen || this.life?.presencePaused);
     const s = this.sprite;
-    if (this.quiet || document.hidden || s.frozen) {
+    if (this.quiet || document.hidden || s.frozen || this.life?.presencePaused) {
       s.stopSquash();
       for (const video of [s.videoA, s.videoB]) {
         video.pause();
@@ -157,13 +162,19 @@ class CloudBunnyCompanion {
       ...(!this.quiet ? [{ label: '和云朵兔玩', children: [
         { label: '眨眨眼', action: 'bunny-blink' },
         { label: '开心跳一下', action: 'bunny-hop' },
+        { label: '伸个懒腰', action: 'bunny-stretch' },
+        { label: '挥挥手', action: 'bunny-wave' },
+        { label: '小范围散步', action: 'bunny-stroll' },
       ] }] : []),
       motion,
     ];
   }
 
   handleMenu(action) {
-    if (action === 'bunny-hide') {
+    if (['bunny-stretch', 'bunny-wave', 'bunny-stroll'].includes(action)) {
+      this.life?.perform(action.slice(6));
+    } else if (action === 'bunny-hide') {
+      this.life?.cancelRequest();
       this.sprite.setPetDisplay(this.sprite.pet.display === 'both' ? 'web' : 'none');
     } else if (action === 'bunny-blink' || action === 'bunny-hop') {
       this.react(action === 'bunny-blink' ? 'blink' : 'hop');
@@ -186,6 +197,7 @@ class CloudBunnyCompanion {
 
   dispose() {
     this.disposed = true;
+    this.life?.dispose();
     clearTimeout(this.idleTimer);
     this.idleTimer = null;
     this.cancelEffects();

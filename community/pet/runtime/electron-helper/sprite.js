@@ -591,7 +591,7 @@ class PetSprite {
       this.companion?.onAnimation(next);
       this.playback = playbackId || null;
       el.style.transform = this.facing === 'right' ? 'scaleX(-1)' : '';
-      const staticOnly = this.companion && (this.companion.quiet || document.hidden);
+      const staticOnly = this.companion && (this.companion.quiet || this.companion.life?.presencePaused || document.hidden);
       const playback = staticOnly ? (el.pause(), Promise.resolve()) : el.play();
       playback
         .then(() => {
@@ -620,7 +620,7 @@ class PetSprite {
       el.removeEventListener('loadeddata', onReady);
       if (!this.pending || this.pending.gen !== gen || this.ac.signal.aborted) return;
       // Keep the old decoded frame visible until the replacement is presented.
-      if (this.companion?.quiet || document.hidden || typeof el.requestVideoFrameCallback !== 'function') {
+      if (this.companion?.quiet || this.companion?.life?.presencePaused || document.hidden || typeof el.requestVideoFrameCallback !== 'function') {
         commit();
         return;
       }
@@ -1692,7 +1692,7 @@ class PetSprite {
     if (this.companion) tools.push(...this.companion.menuItems());
     tools.push({ label: '查看余额', action: 'show-balance' });
     tools.push(
-      { label: '碎碎念', action: 'whisper' },
+      ...(!this.companion ? [{ label: '碎碎念', action: 'whisper' }] : []),
       { label: '对话', action: 'chat' },
       { label: '回到初始位置', action: 'home' },
       // 显示位置（仅网页/仅桌面/两者/都不）：改这只宠物的 display 配置 + 宿主重载生效。
@@ -1853,7 +1853,7 @@ class PetSprite {
     }
     const m = S.mountChatDialog({
       petId: this.pet.id,
-      baseUrl: BASE + '/chat',
+      baseUrl: BASE + (this.companion ? '/companion/chat' : '/chat'),
       surface: 'desktop',
       x: Math.max(4, this.hit.getBoundingClientRect().right + 6),
       y: Math.max(4, this.hit.getBoundingClientRect().top + 6),
@@ -1862,6 +1862,7 @@ class PetSprite {
       onSent: () => {
         // 发送成功：回复已写进 S → 版本号变 → 挂着的长轮询立刻返回并弹气泡（0 延迟）
         console.info('[dsh-pet] 对话已发送 pet=' + this.pet.id);
+        void this.companion?.life.refreshDecision();
       },
       onClose: () => {
         this.chatClose = null;
@@ -1871,6 +1872,7 @@ class PetSprite {
         if (!this.menuOpen) this.setInteractive(false); // 弹窗关了且无菜单：恢复命中区穿透
       },
     });
+    if (this.companion) m.el.querySelector('textarea').maxLength = 1000;
     this.chatClose = m.close;
     this.chatOpen = true; // 穿透守卫：弹窗期间整窗保持可交互，光标移到输入框不被翻回穿透
     window.__dshPetDebug.chatOpen = true;

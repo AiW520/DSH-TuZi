@@ -49,7 +49,7 @@ try {
   failWrite = true;
   await page.getByRole('button', { name: '关闭桌面云朵兔' }).click();
   await page.getByRole('button', { name: '保存失败，请重试' }).waitFor();
-  assert.equal(await page.getByRole('button').getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.getByRole('button', { name: '保存失败，请重试' }).getAttribute('aria-pressed'), 'true');
   assert.equal(display, 'desktop');
   failWrite = false;
   await page.getByRole('button', { name: '保存失败，请重试' }).click();

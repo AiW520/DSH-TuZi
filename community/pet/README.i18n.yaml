@@ -3,5 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write community/pet/README.md
 /cloud-bunny:
-  en: fdcc6a7004667a95
-  zh: f86e207f0761aecc
+  en: 45323dd24e581075
+  zh: 19227cf796a4df96
+/cloud-bunny/ai-companionship:
+  en: 3df7ac244af7f933
+  zh: afc6879d77001fb3

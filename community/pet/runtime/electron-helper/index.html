@@ -47,6 +47,9 @@
       .pet-motion[data-animation="working"] { animation: bunny-type .65s ease-in-out infinite; }
       .pet-motion[data-animation="waiting"] { animation: bunny-think 4s ease-in-out infinite; }
       .pet-motion[data-animation="happy"] { animation: bunny-celebrate 1.4s ease-in-out infinite; }
+      .pet-motion[data-animation="nap"] { animation: bunny-breathe 5s ease-in-out infinite; }
+      .pet-motion[data-animation="wave"] { animation: bunny-think 2s ease-in-out infinite; }
+      .pet-motion[data-animation="stretch"] { animation: bunny-breathe 2s ease-in-out infinite; }
       .pet-motion[data-animation="error"] { animation: bunny-breathe 3s ease-in-out infinite; }
       .pet-sprite[data-motion-paused="true"] .pet-motion { animation: none; }
       @keyframes bunny-breathe { 50% { transform: scale(1.012, 1.025); } }
@@ -281,6 +284,7 @@
     <script src="./shared-core.js"></script>
     <script src="./constants.js"></script>
     <script src="./companion.js"></script>
+    <script src="./companion-life.js"></script>
     <script src="./sprite.js"></script>
     <script src="./events.js"></script>
     <script src="./renderer.js"></script>
