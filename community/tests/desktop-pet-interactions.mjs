@@ -53,11 +53,36 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.waitForFunction(() => window.__dshPetDebug?.configOk && typeof sprites !== 'undefined' && sprites[0]?.companion?.ready, {}, { timeout: 20000 });
   await page.waitForFunction(() => sprites[0].workState === 'working', {}, { timeout: 5000 });
+  await page.waitForFunction(() => !sprites[0].pending && document.querySelector('.pet-video.is-front')?.readyState >= 2);
+  const originalGeneration = await page.evaluate(() => sprites[0].gen);
+  work = { state: 'working', task: '同一状态只更新任务文字' }; counter++;
+  await page.waitForFunction(() => sprites[0].workText === '同一状态只更新任务文字');
+  assert.equal(await page.evaluate(() => sprites[0].gen), originalGeneration, 'task text updates must not reload the video');
+  await page.evaluate(() => {
+    window.__blankFrames = 0;
+    const sample = () => {
+      const visible = [...document.querySelectorAll('.pet-video')].filter(v => getComputedStyle(v).opacity === '1' && v.readyState >= 2);
+      if (!visible.length) window.__blankFrames++;
+      window.__sampleFrame = requestAnimationFrame(sample);
+    };
+    sample();
+    for (let i = 0; i < 20; i++) sprites[0].switchTo(i % 2 ? 'waiting' : 'thinking', false);
+    sprites[0].switchTo('working', false);
+  });
+  await page.waitForFunction(() => !sprites[0].pending && document.querySelector('.pet-video.is-front')?.currentSrc.endsWith('/working.webm'));
+  await page.evaluate(() => cancelAnimationFrame(window.__sampleFrame));
+  assert.equal(await page.evaluate(() => window.__blankFrames), 0, 'rapid switches retain a decoded frame');
   const setWork = async state => {
     work = { state, task: state ? '正在验收桌宠互动' : null }; counter++;
     await page.waitForFunction(state => sprites[0].workState === state, state, { timeout: 6000 });
   };
   const position = await page.evaluate(() => ({ ...sprites[0].pos }));
+  for (const [state, animation] of [['thinking', 'thinking'], ['waiting', 'waiting'], ['success', 'happy'], ['error', 'error'], ['working', 'working']]) {
+    await setWork(state);
+    await page.waitForFunction(animation => !sprites[0].pending && sprites[0].motion.dataset.animation === animation, animation);
+    assert.equal(await page.evaluate(() => sprites[0].motion.getAnimations().some(a => a.playState === 'running')), true);
+    await page.screenshot({ path: join(evidence, state + '.png') });
+  }
   await page.locator('.pet-hit').click();
   await page.waitForFunction(() => document.querySelector('.pet-art').getAnimations().some(a => a.playState === 'running'));
   assert.equal(await page.evaluate(() => sprites[0].workState), 'working');
@@ -67,6 +92,7 @@ try {
   await setWork(null);
   await page.waitForFunction(() => sprites[0].anim === 'idle', {}, { timeout: 6000 });
   await page.waitForFunction(() => document.querySelector('.pet-blink').classList.contains('is-blinking'), {}, { timeout: 10000 });
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.pet-video.is-front')).visibility), 'visible', 'blinking must not hide the body');
   await page.screenshot({ path: join(evidence, 'blink.png') });
   await page.waitForFunction(() => !document.querySelector('.pet-blink').classList.contains('is-blinking'));
   await page.locator('.pet-hit').click({ button: 'right' });
@@ -85,6 +111,7 @@ try {
   await page.getByText('减少动作', { exact: true }).click();
   assert.equal(await page.evaluate(() => sprites[0].companion.quiet), true);
   assert.equal(await page.evaluate(() => [...document.querySelectorAll('video')].every(v => v.paused)), true);
+  assert.equal(await page.evaluate(() => sprites[0].motion.getAnimations().length), 0, 'reduced motion also stops CSS movement');
   await setWork('thinking');
   await page.waitForFunction(() => document.querySelector('.pet-video.is-front').currentSrc.endsWith('/thinking.webm'));
   assert.equal(await page.evaluate(() => document.querySelector('.pet-video.is-front').paused), true);

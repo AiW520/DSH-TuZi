@@ -213,7 +213,10 @@ class PetSprite {
 
     this.art = document.createElement('div');
     this.art.className = 'pet-art';
-    this.art.append(this.videoA, this.videoB);
+    this.motion = document.createElement('div');
+    this.motion.className = 'pet-motion';
+    this.motion.append(this.videoA, this.videoB);
+    this.art.append(this.motion);
     stage.appendChild(this.art);
     stage.appendChild(this.hit);
     this.el.appendChild(this.bubble);
@@ -299,6 +302,9 @@ class PetSprite {
 
   dispose() {
     this.ac.abort();
+    this.cancelVideoLoad?.();
+    this.pending = null;
+    for (const video of [this.videoA, this.videoB]) { video.pause(); video.onended = null; }
     this.companion?.dispose();
     this.inputRegionMutation.disconnect();
     this.inputRegionResize.disconnect();
@@ -495,6 +501,14 @@ class PetSprite {
   // 双缓冲切换（与浏览器同一套：前台 opacity 切换 + 降级视频清 handler 并停播，防残留 ended 雪崩）
   switchTo(next, nextOnce, playbackId, url) {
     if (!next) return;
+    const source = url || this.assetBase + encodeURIComponent(next) + (S.ANIMATION_EXT || '.webm');
+    const frontVideo = this.front === 0 ? this.videoA : this.videoB;
+    if (!playbackId && !this.pending && !this.pendingSquash && !this.pendingMove && frontVideo.currentSrc === source && frontVideo.readyState >= 2 && !frontVideo.ended) {
+      frontVideo.style.transform = this.facing === 'right' ? 'scaleX(-1)' : '';
+      frontVideo.loop = !nextOnce;
+      frontVideo.onended = nextOnce ? () => this.handleEnded() : null;
+      return;
+    }
     this.companion?.cancelEffects();
     const pending = this.pending;
     if (pending && pending.anim === next && pending.once === nextOnce) {
@@ -512,6 +526,7 @@ class PetSprite {
       }
       return;
     }
+    this.cancelVideoLoad?.();
     const gen = ++this.gen;
     this.pending = { anim: next, once: nextOnce, gen };
     const target = this.front === 0 ? this.videoB : this.videoA;
@@ -520,17 +535,28 @@ class PetSprite {
     // 素材地址两条路（POST /anim 的 url 参数）：url 形态直接用第三方给的**完整地址**——宿主已把
     // scheme 卡在 http/https，这里**不经 bridge、也不拼 BASE**（地址本身就与本页 origin 无关）；
     // name 形态照旧按「素材根 + 名字」拼（名字即文件名）。
-    el.src = url || this.assetBase + encodeURIComponent(next) + (S.ANIMATION_EXT || '.webm');
+    el.src = source;
     el.loop = !nextOnce;
     el.muted = true;
-    el.autoplay = true;
+    el.autoplay = false;
     el.playsInline = true;
     el.onended = nextOnce ? () => this.handleEnded() : null;
     // 加载兜底（与浏览器 web 端 fetch+blob 的 10s 超时同义）：素材加载失败或卡住时必须释放
     // pending，否则它永久挂起——之后相同目标会被防重分支吞掉、不同目标靠 gen 覆盖，
     // 表现就是"点了没反应"（#62 报告的就是 web 端同一类问题，桌面端此前完全没有兜底）。
+    let frame = null;
+    const cleanup = () => {
+      window.clearTimeout(loadTimer);
+      el.removeEventListener('loadeddata', onReady);
+      if (frame !== null) el.cancelVideoFrameCallback(frame);
+      frame = null;
+      el.onerror = null;
+      if (this.cancelVideoLoad === cleanup) this.cancelVideoLoad = null;
+    };
     const loadGuard = (why) => {
       if (!this.pending || this.pending.gen !== gen) return;
+      cleanup();
+      el.pause();
       this.pending = null;
       console.warn('[dsh-pet] 素材加载失败 pet=' + this.pet.id + ' anim=' + next + '：' + why + '（已释放本次切换）');
       // 播放回执：这一段点播没能播起来 → 如实回 failed（而不是让调用方干等到 timeout）
@@ -544,12 +570,9 @@ class PetSprite {
       window.clearTimeout(loadTimer);
       loadGuard('video error');
     };
-    el.load();
-    const onReady = () => {
-      el.removeEventListener('loadeddata', onReady);
-      window.clearTimeout(loadTimer);
-      el.onerror = null;
-      if (this.pending && this.pending.gen !== gen) return;
+    const commit = () => {
+      if (this.ac.signal.aborted || !this.pending || this.pending.gen !== gen) return;
+      cleanup();
       const old = this.front === 0 ? this.videoA : this.videoB;
       el.classList.add('is-front');
       if (old && old !== el) {
@@ -563,8 +586,9 @@ class PetSprite {
           this.reportPlayback(this.playback, 'cancelled', 'superseded');
         }
       }
-      this.front = this.front === 0 ? 1 : 0;
+      this.front = el === this.videoA ? 0 : 1;
       this.pending = null;
+      this.companion?.onAnimation(next);
       this.playback = playbackId || null;
       el.style.transform = this.facing === 'right' ? 'scaleX(-1)' : '';
       const staticOnly = this.companion && (this.companion.quiet || document.hidden);
@@ -592,7 +616,20 @@ class PetSprite {
       }
       if (this.pendingMove) this.startMoveDrive(el);
     };
+    const onReady = () => {
+      el.removeEventListener('loadeddata', onReady);
+      if (!this.pending || this.pending.gen !== gen || this.ac.signal.aborted) return;
+      // Keep the old decoded frame visible until the replacement is presented.
+      if (this.companion?.quiet || document.hidden || typeof el.requestVideoFrameCallback !== 'function') {
+        commit();
+        return;
+      }
+      frame = el.requestVideoFrameCallback(commit);
+      el.play().catch(() => loadGuard('play rejected'));
+    };
+    this.cancelVideoLoad = cleanup;
     el.addEventListener('loadeddata', onReady);
+    el.load();
     if (el.readyState >= 2) onReady();
   }
 
@@ -624,6 +661,7 @@ class PetSprite {
   applyFreeze(next) {
     if (this.frozen === next) return;
     this.frozen = next;
+    if (this.companion) this.companion.syncMotion();
     this.companion?.cancelEffects();
     const el = this.front === 0 ? this.videoA : this.videoB;
     const stamp = '[dsh-pet] ' + new Date().toTimeString().slice(0, 8) + ' pet=' + this.pet.id;

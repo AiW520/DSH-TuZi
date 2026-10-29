@@ -104,6 +104,21 @@ try {
   const login = await fetch(host, { redirect: "manual" });
   const cookie = login.headers.getSetCookie().map((v) => v.split(";")[0]).join("; ");
   const origin = new URL(host).origin;
+  const visibility = async () => {
+    const response = await fetch(origin + '/dsh-pet-7340/config', { headers: { cookie } });
+    assert(response.ok);
+    const config = await response.json();
+    return config.main.pets.find(pet => pet.id === 'cloud-bunny').display;
+  };
+  await page.getByRole('button', { name: /关闭桌面云朵兔|Hide desktop bunny/ }).click();
+  await page.getByRole('button', { name: /开启桌面云朵兔|Show desktop bunny/ }).waitFor();
+  assert.equal(await visibility(), 'none', 'sidebar switch must persist hidden state');
+  await page.reload();
+  await page.getByRole('button', { name: /开启桌面云朵兔|Show desktop bunny/ }).waitFor({ timeout: 30000 });
+  await page.getByRole('button', { name: /开启桌面云朵兔|Show desktop bunny/ }).click();
+  await page.getByRole('button', { name: /关闭桌面云朵兔|Hide desktop bunny/ }).waitFor();
+  assert.equal(await visibility(), 'desktop', 'a hidden bunny must be recoverable from the main app');
+  await page.waitForFunction(() => globalThis.__acceptCtx?.get('sessions'), {}, { timeout: 30000 });
   const getState = async () => {
     const response = await fetch(origin + "/dsh-pet-7340/state", { headers: { cookie } });
     if (!response.ok) throw new Error("pet state HTTP " + response.status);

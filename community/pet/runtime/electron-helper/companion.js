@@ -28,7 +28,7 @@ class CloudBunnyCompanion {
       console.warn('[dsh-tuzi-pet] 闭眼素材无法加载，保留现有桌宠动画');
     }, { signal: sprite.ac.signal });
     this.blinkImage.src = new URL('./assets/blink.webp', document.baseURI).href;
-    sprite.art.appendChild(this.blinkImage);
+    sprite.motion.appendChild(this.blinkImage);
     sprite.hit.setAttribute('role', 'button');
     sprite.hit.tabIndex = 0;
     sprite.hit.setAttribute('aria-label', '云朵兔：点击轻跳，右键选择互动');
@@ -63,11 +63,10 @@ class CloudBunnyCompanion {
   }
 
   blink() {
-    if (!this.canReact() || !this.ready) return;
+    if (!this.canReact() || !this.ready || !this.sprite.animations.idle.includes(this.sprite.anim)) return;
     this.cancelEffects();
     this.blinkImage.style.transform = this.sprite.facing === 'right' ? 'scaleX(-1)' : '';
     this.blinkImage.classList.add('is-blinking');
-    this.sprite.art.classList.add('has-blink');
     this.blinkTimer = setTimeout(() => {
       this.blinkTimer = null;
       this.blinkImage.classList.remove('is-blinking');
@@ -113,6 +112,10 @@ class CloudBunnyCompanion {
     this.greetingView = null;
   }
 
+  onAnimation(name) {
+    this.sprite.motion.dataset.animation = name;
+  }
+
   scheduleBlink() {
     clearTimeout(this.idleTimer);
     this.idleTimer = null;
@@ -128,6 +131,7 @@ class CloudBunnyCompanion {
     if (this.disposed) return;
     this.cancelEffects();
     this.sprite.el.dataset.quiet = String(this.quiet);
+    this.sprite.el.dataset.motionPaused = String(this.quiet || document.hidden || this.sprite.frozen);
     const s = this.sprite;
     if (this.quiet || document.hidden || s.frozen) {
       s.stopSquash();
@@ -149,6 +153,7 @@ class CloudBunnyCompanion {
       ? { label: '减少动作：跟随系统', action: 'bunny-system-motion' }
       : { label: this.reduceMotion ? '恢复活泼动作' : '减少动作', action: 'bunny-toggle-motion' };
     return [
+      { label: '隐藏云朵兔（主界面可开启）', action: 'bunny-hide' },
       ...(!this.quiet ? [{ label: '和云朵兔玩', children: [
         { label: '眨眨眼', action: 'bunny-blink' },
         { label: '开心跳一下', action: 'bunny-hop' },
@@ -158,7 +163,9 @@ class CloudBunnyCompanion {
   }
 
   handleMenu(action) {
-    if (action === 'bunny-blink' || action === 'bunny-hop') {
+    if (action === 'bunny-hide') {
+      this.sprite.setPetDisplay(this.sprite.pet.display === 'both' ? 'web' : 'none');
+    } else if (action === 'bunny-blink' || action === 'bunny-hop') {
       this.react(action === 'bunny-blink' ? 'blink' : 'hop');
     } else if (action === 'bunny-toggle-motion') {
       this.reduceMotion = !this.reduceMotion;

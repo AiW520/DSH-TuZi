@@ -68,6 +68,16 @@ h1 { font-size: clamp(42px, 4.6vw, 64px); letter-spacing: -2.6px; line-height: 1
 .pet-media video { position: absolute; inset: 0; opacity: 0; }
 .pet-media.is-playing video { opacity: 1; }
 .pet-media.is-playing img { visibility: hidden; }
+/* Match the desktop motion layer around the shared state artwork. */
+.pet-media { transform-origin: 50% 87%; }
+body[data-motion="playing"] .pet-media.is-playing { animation: pet-breathe 4s ease-in-out infinite; }
+body[data-motion="playing"] .pet-media.is-playing:is([data-state="thinking"], [data-state="waiting"]) { animation: pet-think 3s ease-in-out infinite; }
+body[data-motion="playing"] .pet-media.is-playing[data-state="working"] { animation: pet-type .65s ease-in-out infinite; }
+body[data-motion="playing"] .pet-media.is-playing[data-state="happy"] { animation: pet-celebrate 1.4s ease-in-out infinite; }
+@keyframes pet-breathe { 50% { transform: scale(1.012, 1.025); } }
+@keyframes pet-think { 25% { transform: rotate(-2deg); } 75% { transform: rotate(2deg); } }
+@keyframes pet-type { 50% { transform: translateY(-2px) rotate(.6deg); } }
+@keyframes pet-celebrate { 30% { transform: translateY(-9px) rotate(-2deg); } 70% { transform: translateY(-4px) rotate(2deg); } }
 .hero-pet { width: 155%; height: 100%; margin-left: -27.5%; }
 .little-note { position: absolute; right: -4px; bottom: 99px; transform: rotate(8deg); background: #fff9f1; padding: 18px 16px 14px; border: 1px solid #ecdacb; border-radius: 8px 8px 25px 8px; font-size: 11px; color: #85665a; line-height: 1.9; box-shadow: 0 8px 18px #86685509; pointer-events: none; }
 .little-note::before { content: ""; position: absolute; width: 40px; height: 13px; background: #e9c5b9aa; top: -6px; left: 32px; transform: rotate(-5deg); }

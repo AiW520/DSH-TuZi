@@ -20,10 +20,10 @@ PetSprite.prototype.onWorkTick = function onWorkTick(snapshot, tick) {
   // applyFreeze 的 resumeWorkStatusAnim() 重新对齐**当前**状态，所以不会停在旧档位上。
   // 宿主侧不挡这个全局段：sections.workStatus 是所有宠物共用一份，宿主"跳过写入"会连带静音
   // 别的宠物（issue #122 要的是"只控制指定 main"），所以按宠物在渲染端忽略。
-  if (this.frozen) return;
   const state = snapshot && snapshot.state ? snapshot.state : null;
-  this.companion?.onTaskChange();
+  if (this.prevWorkState !== state) this.companion?.onTaskChange();
   this.workState = state; // 当前工作状态：互动/事件动画播完恢复档位循环用（与浏览器 workStatusRef 同用途）
+  if (this.frozen) return;
   const stateChanged = this.prevWorkState !== state;
   this.prevWorkState = state;
   if (!state) {
@@ -45,7 +45,7 @@ PetSprite.prototype.onWorkTick = function onWorkTick(snapshot, tick) {
     this.workOn = false;
     this.workText = null;
     this.renderBubble();
-    if (this.companion?.quiet) this.playIdle();
+    if (this.companion) this.playIdle();
     return;
   }
   const pool = this.animations.events?.workStatus;

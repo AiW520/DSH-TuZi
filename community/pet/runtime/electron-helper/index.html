@@ -41,9 +41,20 @@
         pointer-events: none;
       }
       .pet-art { position: absolute; inset: 0; pointer-events: none; transform-origin: 50% 87%; }
+      .pet-motion { position: absolute; inset: 0; transform-origin: 50% 87%; }
+      .pet-motion[data-animation="idle"] { animation: bunny-breathe 4s ease-in-out infinite; }
+      .pet-motion[data-animation="thinking"] { animation: bunny-think 3s ease-in-out infinite; }
+      .pet-motion[data-animation="working"] { animation: bunny-type .65s ease-in-out infinite; }
+      .pet-motion[data-animation="waiting"] { animation: bunny-think 4s ease-in-out infinite; }
+      .pet-motion[data-animation="happy"] { animation: bunny-celebrate 1.4s ease-in-out infinite; }
+      .pet-motion[data-animation="error"] { animation: bunny-breathe 3s ease-in-out infinite; }
+      .pet-sprite[data-motion-paused="true"] .pet-motion { animation: none; }
+      @keyframes bunny-breathe { 50% { transform: scale(1.012, 1.025); } }
+      @keyframes bunny-think { 25% { transform: rotate(-2deg); } 75% { transform: rotate(2deg); } }
+      @keyframes bunny-type { 50% { transform: translateY(-2px) rotate(.6deg); } }
+      @keyframes bunny-celebrate { 30% { transform: translateY(-9px) rotate(-2deg); } 70% { transform: translateY(-4px) rotate(2deg); } }
       .pet-blink { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: none; }
-      .pet-blink.is-blinking { display: block; }
-      .pet-art.has-blink video.pet-video { visibility: hidden; }
+      .pet-blink.is-blinking { display: block; clip-path: polygon(37% 34%, 59% 34%, 59% 51%, 37% 51%); }
       .pet-sprite[data-quiet="true"] video.pet-video { transition: none; }
       .pet-hit:focus-visible { outline: 2px solid #789c83; outline-offset: 5px; border-radius: 35%; }
       video.pet-video {
@@ -54,7 +65,7 @@
         object-fit: contain;
         pointer-events: none;
         opacity: 0;
-        transition: opacity 0.18s ease;
+        transition: none;
       }
       video.pet-video.is-front {
         opacity: 1;
