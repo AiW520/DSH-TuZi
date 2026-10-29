@@ -4,12 +4,12 @@
     {
       "platform": "Windows",
       "arch": "x64",
-      "version": "0.2.1-rc.3-community.3",
-      "bytes": 314765231,
-      "sha256": "9f836ccc79a7d9afb6a1b975ca4ea1a821d147f6832dcfef12c068924db19db4",
+      "version": "0.2.1-rc.3-community.4",
+      "bytes": 315348258,
+      "sha256": "dff0cd2a0974694088b7574bf65e02a8484956e4703ca11bdd8cac8350b8c87d",
       "signing": "unsigned-test",
       "qualified": true,
-      "url": "https://github.com/AiW520/DSH-TuZi/releases/download/v0.2.1-rc.3-community.3/dsh-tuzi-0.2.1-rc.3-win-x64-unsigned.exe"
+      "url": "https://github.com/AiW520/DSH-TuZi/releases/download/v0.2.1-rc.3-community.4/dsh-tuzi-0.2.1-rc.3-win-x64-unsigned.exe"
     },
     {
       "platform": "macOS",
