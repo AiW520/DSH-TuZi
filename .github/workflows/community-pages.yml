@@ -3,14 +3,31 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['community/site/**', '.github/workflows/community-pages.yml']
+    paths: ['community/site/**', 'community/tests/download-tools.mjs', '.github/workflows/community-pages.yml']
 permissions:
   contents: read
 concurrency:
   group: community-pages
   cancel-in-progress: true
 jobs:
+  downloads:
+    if: github.repository == 'AiW520/DSH-TuZi'
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
+      - name: Verify native download recovery and manifest retries
+        run: node --test community/tests/download-tools.mjs
   deploy:
+    needs: downloads
     if: github.repository == 'AiW520/DSH-TuZi'
     runs-on: ubuntu-latest
     permissions:

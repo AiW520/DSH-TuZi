@@ -31,7 +31,7 @@ let browser;
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 try {
   browser = await chromium.launch({ headless: true, ...(process.env.DSH_TEST_BROWSER_CHANNEL ? { channel: process.env.DSH_TEST_BROWSER_CHANNEL } : {}) });
-  const visit = async (platform, ua, releases = manifest.releases, mobile = false) => {
+  const visit = async (platform, ua, releases = manifest.releases, mobile = false, manifestRoute) => {
     const context = await browser.newContext({ userAgent: ua, viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 1000 } });
     await context.addInitScript(({ platform, mobile }) => {
       Object.defineProperty(navigator, 'userAgentData', { value: undefined });
@@ -39,7 +39,7 @@ try {
       Object.defineProperty(navigator, 'maxTouchPoints', { value: mobile ? 5 : 0 });
     }, { platform, mobile });
     const page = await context.newPage();
-    await page.route('**/releases.json', route => route.fulfill({ json: { schemaVersion: 1, releases } }));
+    await page.route('**/releases.json', manifestRoute || (route => route.fulfill({ json: { schemaVersion: 1, releases } })));
     await page.goto(`http://127.0.0.1:${server.address().port}/#download`);
     await page.waitForFunction(() => document.getElementById('release-status').textContent !== '加载版本信息');
     return { page, context };
@@ -47,32 +47,54 @@ try {
   let { page, context } = await visit('Win32', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', [mac]);
   assert.equal(await page.locator('#release-system').inputValue(), 'Windows');
   assert.equal(await page.locator('#release-status').textContent(), '暂未发布');
-  assert.equal(await page.locator('#release-list a').count(), 0);
+  assert.equal(await page.locator('#release-list a.primary').count(), 0);
   await page.locator('.release-panel').screenshot({ path: resolve(output, 'windows-unavailable.png') });
   await page.selectOption('#release-system', 'macOS');
-  assert.match(await page.locator('#release-list a').getAttribute('href'), /\.dmg$/);
+  assert.match(await page.locator('#release-list a.primary').getAttribute('href'), /\.dmg$/);
   await page.selectOption('#release-architecture', 'x64');
-  assert.equal(await page.locator('#release-list a').count(), 0, 'Intel Mac must not receive Apple Silicon installer');
+  assert.equal(await page.locator('#release-list a.primary').count(), 0, 'Intel Mac must not receive Apple Silicon installer');
   await context.close();
   ({ page, context } = await visit('Win32', 'Windows NT 10.0', [mac, windows]));
-  assert.equal(await page.locator('#release-list a').count(), 1);
-  assert.match(await page.locator('#release-list a').getAttribute('href'), /\.exe$/);
+  assert.equal(await page.locator('#release-list a.primary').count(), 1);
+  assert.match(await page.locator('#release-list a.primary').getAttribute('href'), /\.exe$/);
   assert.match(await page.locator('#release-list').textContent(), /未签名/);
+  await page.locator('.download-help > summary').click();
+  await page.locator('.download-advanced > summary').click();
+  assert.match(await page.getByRole('textbox', { name: '续传命令内容' }).inputValue(), /curl\.exe/);
+  assert.match(await page.getByRole('textbox', { name: '续传命令内容' }).inputValue(), /Get-FileHash/);
+  // Permission failure must retain the full command for manual copying.
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('denied'); } }, configurable: true }));
+  await page.getByRole('button', { name: '复制续传命令' }).click();
+  await page.getByText('请复制已选中的内容').waitFor();
+  assert.equal(await page.getByRole('textbox', { name: '续传命令内容' }).evaluate(el => el.selectionEnd - el.selectionStart), (await page.getByRole('textbox', { name: '续传命令内容' }).inputValue()).length);
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { value: { writeText: async text => { window.copiedDownload = text; } }, configurable: true }));
+  await page.getByRole('button', { name: '复制下载链接' }).click();
+  await page.getByText('已复制', { exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => window.copiedDownload), windows.url);
+  await context.route(windows.url, route => route.abort());
+  await page.locator('#release-list a.primary').click();
+  await page.getByText(/此页面无法读取下载进度/).waitFor();
+  await page.locator('.download-advanced > summary').click();
   await page.locator('.release-panel').screenshot({ path: resolve(output, 'windows-available.png') });
   await page.selectOption('#release-architecture', 'arm64');
-  assert.equal(await page.locator('#release-list a').count(), 0);
+  assert.equal(await page.locator('#release-list a.primary').count(), 0);
   await page.selectOption('#release-system', 'Linux');
   assert.equal(await page.locator('#release-status').textContent(), '暂未发布');
   await context.close();
   ({ page, context } = await visit('MacIntel', 'Mozilla/5.0 Macintosh'));
   assert.equal(await page.locator('#release-system').inputValue(), 'macOS');
+  await page.locator('.download-help > summary').click();
+  await page.locator('.download-advanced > summary').click();
+  assert.match(await page.getByRole('textbox', { name: '续传命令内容' }).inputValue(), /shasum -a 256/);
+  assert.doesNotMatch(await page.getByRole('textbox', { name: '续传命令内容' }).inputValue(), /curl\.exe/);
+  await page.locator('.download-advanced > summary').click();
   await page.locator('.release-panel').screenshot({ path: resolve(output, 'macos.png') });
   await context.close();
   ({ page, context } = await visit('iPhone', 'Mozilla/5.0 iPhone', [mac], true));
-  assert.equal(await page.locator('#release-list a').count(), 0);
+  assert.equal(await page.locator('#release-list a.primary').count(), 0);
   assert.equal(await page.locator('#release-system').inputValue(), '');
   await page.selectOption('#release-system', 'Windows');
-  assert.equal(await page.locator('#release-list a').count(), 0);
+  assert.equal(await page.locator('#release-list a.primary').count(), 0);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
   await page.locator('.release-panel').screenshot({ path: resolve(output, 'mobile.png') });
   await context.close();
@@ -82,9 +104,36 @@ try {
   await page.route('**/releases.json', route => route.fulfill({ status: 503, body: 'unavailable' }));
   await page.reload();
   await page.waitForFunction(() => document.getElementById('release-status').textContent === '下载信息暂不可用');
-  assert.equal(await page.locator('#release-list a').count(), 0);
+  assert.equal(await page.locator('#release-list a.primary').count(), 0);
   assert(await page.getByRole('link', { name: /版本说明与已知限制/ }).count());
   await context.close();
+  let attempts = 0;
+  ({ page, context } = await visit('Win32', 'Windows NT 10.0', [windows], false, route => {
+    attempts++;
+    return attempts < 3 ? route.fulfill({ status: 503, body: 'unavailable' }) : route.fulfill({ json: { schemaVersion: 1, releases: [windows] } });
+  }));
+  assert.equal(attempts, 3);
+  assert.match(await page.locator('#release-list a.primary').getAttribute('href'), /\.exe$/);
+  await context.close();
+  attempts = 0;
+  ({ page, context } = await visit('Win32', 'Windows NT 10.0', [windows], false, route => {
+    attempts++;
+    return route.fulfill({ status: 503, body: 'unavailable' });
+  }));
+  assert.equal(attempts, 3);
+  await page.unroute('**/releases.json');
+  await page.route('**/releases.json', route => route.fulfill({ json: { schemaVersion: 1, releases: [windows] } }));
+  await page.getByRole('button', { name: '重新加载版本信息' }).click();
+  await page.waitForFunction(() => document.getElementById('release-status').textContent === 'Windows 可下载');
+  await context.close();
+  ({ page, context } = await visit('iPhone', 'iPhone', [windows], true));
+  await page.selectOption('#release-system', 'Windows');
+  await page.locator('.download-help > summary').click();
+  await page.locator('.download-advanced > summary').click();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  await page.locator('.release-panel').screenshot({ path: resolve(output, 'mobile-recovery.png') });
+  await context.close();
+  console.log('PASS retry recovery/exhaustion/manual reload, clipboard success/denial, platform commands, honest download feedback, mobile expanded help.');
   console.log('PASS Windows unavailable/EXE, macOS/Intel, Linux, mobile, unknown OS, manual switching, unavailable manifest, artifact type validation, mobile overflow.');
 } finally {
   try { if (browser) await browser.close(); }

@@ -31,3 +31,5 @@ pi-ai 默认允许流式连接空闲十分钟，并对临时错误最多重试�
 社区验收工作流在原生 Windows runner 上构建 Windows x64 安装包。未签名预览版不包含上游强制更新策略。安装程序使用社区版名称与云朵兔图标。完成 NSIS 安装后，工作流依次运行安装后的 Harness 和桌宠测试，并验证卸载保留社区数据目录，只有全部成功才生成安装包校验值与验收记录。在出现该记录之前，Windows 下载必须保持不可用。在临时 runner 上运行 `community/scripts/qualify-windows.ps1` 可重新执行安装验收。将 `DSH_COMMUNITY_EVIDENCE_DIR` 设为已有目录，可在其中保留隔离的测试记录；不设置时使用系统临时目录。
 
 下载页识别操作系统，并支持手动选择系统与芯片。不会根据 Mac 浏览器标识猜测 Apple Silicon。缺少对应安装包时显示暂未发布，不将其他系统的安装包作为主下载按钮；手机与未知浏览器需要手动选择。`node community/tests/download-page.mjs` 使用 Playwright 检查这些状态；没有内置 Chromium 时，可设置 `DSH_TEST_BROWSER_CHANNEL=chrome` 使用已安装的 Chrome。
+
+安装包继续托管在 GitHub Release。下载页对版本清单的临时故障最多请求三次，失败后提供手动重新加载。每个已验收下载都提供支持手动复制的链接、对应版本页面，以及可选的原生 curl 续传或 aria2 四连接命令。原生命令保留下载片段，对临时错误最多重试八次，通过 SHA-256 校验后才将临时文件改为安装包名称，并拒绝覆盖同名安装包。中断后可在同一目录再次执行；校验失败时需删除损坏的 `.part` 文件后重试。aria2 为可选工具，需用户事先安装。两种方式均使用 GitHub 原始版本链接，不经过公共代理，也不保存会过期的跳转地址。页面无法读取浏览器下载进度，不能保证带宽提升。`node --test community/tests/download-tools.mjs` 验证原生 curl 字节续传与损坏文件拒绝；Pages 工作流要求 Linux 与原生 Windows 检查通过后才部署。

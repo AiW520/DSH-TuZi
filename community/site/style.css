@@ -313,5 +313,14 @@ body[data-motion="playing"] .star-one { animation: twinkle 5s ease-in-out infini
 .release-selectors select { display: block; width: 100%; min-width: 0; min-height: 44px; margin-top: 7px; padding: 10px 8px; border: 1px solid #cbd5c5; border-radius: 12px; background: #fffef9; color: var(--ink); font: inherit; }
 .release-selectors select:focus-visible { outline: 2px solid #527c63; outline-offset: 3px; }
 .release-entry + .release-entry { border-top: 1px solid #dfe6d3; margin-top: 24px; padding-top: 24px; }
+.release-entry .download-help { margin-top: 15px; padding: 8px 12px; border: 1px solid #dfe6d3; border-radius: 12px; background: #f5f7ed; font-size: 12px; }
+.download-help summary { font-weight: 600; }
+.download-copy { margin: 12px 0; }
+.download-action { min-height: 44px; padding: 9px 12px; border: 1px solid #cbd5c5; border-radius: 10px; background: #fffef9; color: var(--ink); font: inherit; cursor: pointer; }
+.download-feedback { margin-left: 8px; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.download-copy textarea { display: block; width: 100%; min-width: 0; margin-top: 8px; padding: 10px; border: 1px solid #dfe6d3; border-radius: 8px; background: #fffef9; color: var(--ink); font: 11px/1.7 monospace; overflow-wrap: anywhere; resize: vertical; }
+.download-copy textarea:focus-visible { outline: 2px solid #527c63; outline-offset: 2px; }
+.download-release { display: inline-block; padding-block: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.release-entry .download-advanced { padding-top: 5px; }
 @media (max-width: 420px) { .release-selectors { grid-template-columns: 1fr; } }
 @media (pointer: coarse) { .release-selectors select { font-size: 16px; } }
