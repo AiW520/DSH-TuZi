@@ -40,7 +40,10 @@ const server = createServer(async (req, res) => {
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const configUrl = `http://127.0.0.1:${server.address().port}/dsh-pet-7340/config`;
-let app;
+let app, page;
+let failure = null;
+// Allow the owned 8s presence poll, 5s host read and 10s video decode deadlines to settle.
+const presenceTimeout = 30000;
 let log = '';
 const errors = [];
 try {
@@ -54,7 +57,7 @@ try {
   app.process().stderr.on('data', data => { log += data; });
   app.process().stdout.on('data', data => { log += data; });
   await app.evaluate(({ powerMonitor }) => { powerMonitor.getSystemIdleTime = () => 0; });
-  const page = await app.firstWindow();
+  page = await app.firstWindow();
   page.on('pageerror', error => errors.push(error.message));
   await page.waitForFunction(() => window.__dshPetDebug?.configOk && typeof sprites !== 'undefined' && sprites[0]?.companion?.ready, {}, { timeout: 20000 });
   await page.waitForFunction(() => sprites[0].workState === 'working', {}, { timeout: 5000 });
@@ -125,18 +128,30 @@ try {
   assert.equal(await page.evaluate(() => sprites[0].companion.life.perform('wave')), false, 'autonomy does not override tasks');
   await setWork(null);
   await page.waitForFunction(() => !sprites[0].pending);
+  const handoff = await page.evaluate(() => {
+    const sprite = sprites[0];
+    const started = sprite.companion.life.perform('nap');
+    const before = sprite.pending?.anim;
+    // The old front video can end while the replacement is still decoding.
+    sprite.handleEnded();
+    return { started, before, after: sprite.pending?.anim };
+  });
+  assert.deepEqual(handoff, { started: true, before: 'nap', after: 'nap' }, 'old video completion must not replace an explicitly requested pose');
+  await page.waitForFunction(() => !sprites[0].pending);
+  await setWork('working'); await setWork(null);
+  await page.waitForFunction(() => !sprites[0].pending);
   await app.evaluate(({ powerMonitor }) => { powerMonitor.getSystemIdleTime = () => 301; });
-  await page.waitForFunction(() => sprites[0].companion.life.away && sprites[0].motion.dataset.animation === 'nap', {}, {timeout:12000});
+  await page.waitForFunction(() => sprites[0].companion.life.away && sprites[0].motion.dataset.animation === 'nap', {}, {timeout:presenceTimeout});
   await page.waitForFunction(() => sprites[0].companion.life.actionTimer === null, {}, {timeout:17000});
   assert.equal(await page.evaluate(() => sprites[0].motion.dataset.animation), 'nap', 'remain asleep while user is away');
   await app.evaluate(({ powerMonitor }) => { powerMonitor.getSystemIdleTime = () => 0; });
-  await page.waitForFunction(() => sprites[0].motion.dataset.animation === 'wave', {}, {timeout:12000});
+  await page.waitForFunction(() => sprites[0].motion.dataset.animation === 'wave', {}, {timeout:presenceTimeout});
   await app.evaluate(({ powerMonitor }) => powerMonitor.emit('lock-screen'));
-  await page.waitForFunction(() => sprites[0].companion.life.presencePaused, {}, {timeout:12000});
+  await page.waitForFunction(() => sprites[0].companion.life.presencePaused, {}, {timeout:presenceTimeout});
   assert.equal(await page.evaluate(() => sprites[0].companion.life.perform('hop')), false, 'lock screen pauses autonomy');
   assert.equal(await page.evaluate(() => [...document.querySelectorAll('video')].every(v=>v.paused)), true);
   await app.evaluate(({ powerMonitor }) => powerMonitor.emit('unlock-screen'));
-  await page.waitForFunction(() => !sprites[0].companion.life.presencePaused, {}, {timeout:12000});
+  await page.waitForFunction(() => !sprites[0].companion.life.presencePaused, {}, {timeout:presenceTimeout});
   await page.evaluate(() => sprites[0].companion.life.consume({ id:'new-decision',action:'wave',mood:'happy',text:'AI动作测试',expiresAt:Date.now()+10000 }));
   await page.waitForFunction(() => sprites[0].motion.dataset.animation === 'wave');
   assert.equal(await page.evaluate(() => sprites[0].el.dataset.mood), 'happy');
@@ -190,11 +205,25 @@ try {
   });
   assert.deepEqual(await page.evaluate(() => window.__disposedCompanion), { disposed: true, idleTimer: null, blinkTimer: null, reaction: null });
   console.log('PASS desktop helper: current task on launch, click hop without changing task/position, natural and menu blink, menu hop, quiet persistence/chat, local poses, away/return, lock/unlock, task interruption, keyboard, reduced motion, disposal.');
+} catch (error) {
+  failure = { message: error.message, state: null };
+  if (page && !page.isClosed()) {
+    failure.state = await page.evaluate(() => {
+      const s = typeof sprites === 'undefined' ? null : sprites[0];
+      return s ? { anim: s.anim, displayed: s.motion.dataset.animation, pending: s.pending, work: s.workState,
+        visibility: document.visibilityState, quiet: s.companion.quiet, canReact: s.companion.canReact(),
+        away: s.companion.life.away, presencePaused: s.companion.life.presencePaused,
+        moving: s.moveRef !== null, throwing: s.throwRef !== null, menu: s.menuOpen, chat: s.chatOpen,
+        videos: [s.videoA,s.videoB].map(v => ({ ready: v.readyState, ended: v.ended, paused: v.paused, error: v.error?.code })) } : null;
+    }).catch(e => ({ unavailable: e.message }));
+    await page.screenshot({ path: join(evidence, 'failure.png') }).catch(() => {});
+  }
+  throw error;
 } finally {
   if (app) await app.close();
   server.closeAllConnections();
   await new Promise(resolve => server.close(resolve));
   await writeFile(join(evidence, 'launch.log'), log);
-  await writeFile(join(evidence, 'report.json'), JSON.stringify({ errors, routes }, null, 2));
+  await writeFile(join(evidence, 'report.json'), JSON.stringify({ errors, routes, failure }, null, 2));
   console.log('EVIDENCE', evidence);
 }

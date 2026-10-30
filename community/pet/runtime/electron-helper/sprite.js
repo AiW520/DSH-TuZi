@@ -758,6 +758,8 @@ class PetSprite {
       this.playback = null; // 先清再上报：后续链式换源不该把它当成"被打断"
       this.reportPlayback(done, 'ended');
     }
+    // Keep the requested replacement when the old front video ends during decoding.
+    if (this.pending) return;
     if (this.dragState.active) return;
     // 占用锁（issue #122 第 4 项）：冻结期间**动画链一律不推进**——事件动画播完就停在最后一帧。
     // 与浏览器 src/client/pet.ts 的 handleEnded 同一处判断、同一原因：下面四条路都会换源播放，
