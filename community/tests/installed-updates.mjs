@@ -21,7 +21,7 @@ export async function qualifyInstalledUpdates(app, page, output) {
     const url = `https://github.com/AiW520/DSH-TuZi/releases/download/v${version}/dsh-tuzi-0.2.1-rc.3-${os}-${identity.arch}-unsigned.${extension}`;
     const originalFetch = net.fetch, originalOpen = shell.openExternal;
     globalThis.__updateQualification = { requests: 0, opened: [], offline: false,
-      restore: () => { net.fetch = originalFetch; shell.openExternal = originalOpen; } };
+      restore: () => { net.fetch = originalFetch; shell.openExternal = originalOpen; globalThis.__updateQualification.restoreMenu?.(); } };
     net.fetch = async (input, options) => {
       if (input !== 'https://aiw520.github.io/DSH-TuZi/releases.json') return originalFetch(input, options);
       globalThis.__updateQualification.requests++;
@@ -58,9 +58,23 @@ export async function qualifyInstalledUpdates(app, page, output) {
     await app.evaluate(() => { globalThis.__updateQualification.offline = true; });
     assert.equal((await page.evaluate(() => window.dshCommunityUpdates.action('check'))).phase, 'error');
     assert.equal(await page.locator('dialog').count(), 0);
+    if (identity.platform === 'win32') {
+      // Windows constructs its native popup through the caption preload, not the macOS menu bar.
+      await app.evaluate(({ Menu }) => {
+        const popup = Menu.prototype.popup;
+        globalThis.__updateQualification.restoreMenu = () => { Menu.prototype.popup = popup; };
+        Menu.prototype.popup = function (options) {
+          globalThis.__updateQualification.menu = this.items;
+          options.callback?.();
+        };
+      });
+      const caption = page.locator('[data-windows-menu]').getByRole('menuitem').first();
+      await caption.click();
+      await page.waitForFunction(() => document.querySelector('[data-windows-menu]').shadowRoot.querySelector('button').getAttribute('aria-expanded') === 'false');
+    }
     await app.evaluate(({ Menu }) => {
       const find = items => { for (const item of items) { if (/检查更新|Check for updates/i.test(item.label)) return item; if (item.submenu) { const nested = find(item.submenu.items); if (nested) return nested; } } };
-      const item = find(Menu.getApplicationMenu().items);
+      const item = find(process.platform === 'win32' ? globalThis.__updateQualification.menu : Menu.getApplicationMenu().items);
       if (!item) throw new Error('Missing native update menu');
       item.click();
     });
