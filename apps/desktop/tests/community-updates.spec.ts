@@ -33,6 +33,14 @@ describe('qualified release selection', () => {
   ])('rejects unsafe or mismatched qualified metadata: %j', (change) => {
     expect(() => selectCommunityRelease(feed({ ...release(), ...change }), 'Windows', 'x64')).toThrow()
   })
+  it('orders the upstream version separately from the community revision', () => {
+    const make = (base: string, revision: number) => ({ ...release(), version: `${base}-community.${revision}`,
+      url: `https://github.com/AiW520/DSH-TuZi/releases/download/v${base}-community.${revision}/dsh-tuzi-${base}-win-x64-unsigned.exe` })
+    expect(selectCommunityRelease(feed(make('0.2.1-rc.9', 9), make('0.2.1-rc.10', 1)), 'Windows', 'x64')?.version)
+      .toBe('0.2.1-rc.10-community.1')
+    expect(selectCommunityRelease(feed(make('0.2.1-rc.10', 99), make('0.2.1', 1)), 'Windows', 'x64')?.version)
+      .toBe('0.2.1-community.1')
+  })
   it('rejects invalid feeds and ambiguous versions', () => {
     expect(() => selectCommunityRelease({}, 'Windows', 'x64')).toThrow()
     expect(() => selectCommunityRelease(feed(release(), release()), 'Windows', 'x64')).toThrow()
@@ -167,6 +175,14 @@ describe('community notification lifecycle', () => {
     expect(options.openExternal).toHaveBeenCalledWith(release().url)
     await notifier.act('notes', release().version)
     expect(options.openExternal).toHaveBeenLastCalledWith(notifier.state.release?.notesUrl)
+  })
+  it('announces a stable upstream release even when its community counter restarts', async () => {
+    const stable = { ...release(), version: '0.2.1-community.1',
+      url: 'https://github.com/AiW520/DSH-TuZi/releases/download/v0.2.1-community.1/dsh-tuzi-0.2.1-win-x64-unsigned.exe' }
+    const notifier = create({ fetch: async () => Response.json(feed(stable)) })
+    await notifier.check(true)
+    expect(notifier.state.phase).toBe('available')
+    expect(notifier.state.release?.version).toBe(stable.version)
   })
   it('distinguishes missing platform or identity, current versions, and feed failures', async () => {
     const unsupported = create({ arch: 'arm64' }); await unsupported.check(true)

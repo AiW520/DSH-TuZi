@@ -3,5 +3,5 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write community/release-notes/README.md
 /dsh-tuzi-community-preview-qualification:
-  en: 4a5f960d467ab72c
-  zh: 41672f4def03d6c8
+  en: 509900fbbcb5d28e
+  zh: 430e93d5ef50d5e7

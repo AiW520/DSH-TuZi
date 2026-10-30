@@ -14,6 +14,20 @@ function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+function versionParts(value: string): { base: string; revision: bigint } | null {
+  const match = /^(.+)-community\.(0|[1-9][0-9]*)$/.exec(value)
+  const base = match?.[1], revision = match?.[2]
+  if (base === undefined || revision === undefined || valid(base) !== base || valid(value) !== value) return null
+  return { base, revision: BigInt(revision) }
+}
+
+// The distribution suffix must not turn an upstream stable release into an older prerelease.
+function compareVersions(left: string, right: string): number {
+  const a = versionParts(left), b = versionParts(right)
+  if (a === null || b === null) throw new Error('Invalid community release version')
+  return compare(a.base, b.base) || (a.revision > b.revision ? 1 : a.revision < b.revision ? -1 : 0)
+}
+
 /** Read a full community version from packaged metadata; missing identity disables comparison.
  * @param manifest - Parsed installed package.json.
  * @returns Valid community version, or null for older and development packages.
@@ -21,7 +35,7 @@ function object(value: unknown): value is Record<string, unknown> {
 export function communityInstalledVersion(manifest: unknown): string | null {
   if (!object(manifest)) return null
   const value = manifest.dshCommunityVersion
-  return typeof value === 'string' && valid(value) === value && /-community\.\d+$/.test(value) ? value : null
+  return typeof value === 'string' && versionParts(value) !== null ? value : null
 }
 
 /** Select only qualified, unambiguous installers from the owned GitHub release repository.
@@ -41,7 +55,7 @@ export function selectCommunityRelease(feed: unknown, platform: string, arch: st
     const extension = platform === 'Windows' ? 'exe' : platform === 'macOS' ? 'dmg' : 'AppImage'
     const os = platform === 'Windows' ? 'win' : platform === 'macOS' ? 'mac' : 'linux'
     const artifactPattern = new RegExp(`^dsh-tuzi-[a-zA-Z0-9.-]+-${os}-${arch}(?:-unsigned)?\\.${extension}$`)
-    if (typeof version !== 'string' || valid(version) !== version || !/-community\.\d+$/.test(version)
+    if (typeof version !== 'string' || versionParts(version) === null
       || typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes <= 0
       || typeof sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(sha256)
       || (signing !== 'unsigned-test' && signing !== 'signed') || typeof url !== 'string'
@@ -57,7 +71,7 @@ export function selectCommunityRelease(feed: unknown, platform: string, arch: st
     if (releases.some(previous => previous.version === version)) throw new Error('Ambiguous community installer')
     releases.push(release)
   }
-  return releases.sort((a, b) => compare(b.version, a.version))[0] ?? null
+  return releases.sort((a, b) => compareVersions(b.version, a.version))[0] ?? null
 }
 
 interface Preferences {
@@ -127,7 +141,7 @@ export class CommunityUpdates {
   private async loadPreferences(): Promise<void> {
     try {
       const value: unknown = JSON.parse(await readFile(this.options.preferencesPath, 'utf8'))
-      const version = (v: unknown): boolean => v === null || (typeof v === 'string' && valid(v) === v && /-community\.\d+$/.test(v))
+      const version = (v: unknown): boolean => v === null || (typeof v === 'string' && versionParts(v) !== null)
       if (!object(value) || value.schemaVersion !== 1 || !version(value.ignored) || !version(value.snoozed)
         || typeof value.snoozeUntil !== 'number' || !Number.isSafeInteger(value.snoozeUntil) || value.snoozeUntil < 0) {
         throw new Error('Invalid reminder preferences')
@@ -191,7 +205,7 @@ export class CommunityUpdates {
         const release = selectCommunityRelease(feed, this.options.platform, this.options.arch)
         if (this.isDisposed()) return this.state
         if (controller.signal.aborted) throw new Error('Community release check timed out')
-        this.snapshot.release = release !== null && compare(release.version, this.options.version) > 0 ? release : null
+        this.snapshot.release = release !== null && compareVersions(release.version, this.options.version) > 0 ? release : null
         this.snapshot.phase = release === null ? 'unavailable' : this.snapshot.release === null ? 'current' : 'available'
       }
       this.snapshot.checkedAt = this.now()
