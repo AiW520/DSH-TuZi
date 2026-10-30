@@ -100,11 +100,17 @@ export function createElectronBuilderConfig(
   if (windowsSigner !== undefined) {
     installWindowsNsisBootstrapSigner({ sign: windowsSigner })
   }
-  const update = unsigned ? undefined : resolveDesktopAutoUpdateConfig(env, resolvedPlatform, resolvedArch)
+  const update = unsigned || community ? undefined : resolveDesktopAutoUpdateConfig(env, resolvedPlatform, resolvedArch)
   if (preparedRuntime !== undefined) buildPaths.dsh = preparedRuntime
   // electron-builder merges extraMetadata into the packaged manifest, so a build version here reaches
   // the artifact names, the update feed, and the installed app.getVersion() the updater compares against.
   const productVersion = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')).version
+  const communityRelease = community ? JSON.parse(readFileSync(fileURLToPath(new URL('../../../community/release.json', import.meta.url)), 'utf8')) : undefined
+  if (communityRelease !== undefined && (typeof communityRelease.version !== 'string'
+    || !communityRelease.version.startsWith(`${productVersion}-community.`)
+    || !/^(0|[1-9][0-9]*)$/.test(communityRelease.version.slice(`${productVersion}-community.`.length)))) {
+    throw new Error('Community release version must extend the desktop product version')
+  }
   const buildVersion = resolveDesktopBuildVersion(env, productVersion)
   if (update?.channel === 'latest' && buildVersion.includes('-')) throw new Error('desktop package: latest requires a stable version')
   const packaged = resolveDesktopBuildCommit(env)
@@ -112,7 +118,7 @@ export function createElectronBuilderConfig(
     appId,
     protocols: [{ name: brand.name, schemes: [brand.protocol] }],
     extraMetadata: {
-      ...(community ? { name: 'dsh-tuzi-desktop', productName: brand.name, main: 'lib/community-entry.js' } : {}),
+      ...(community ? { name: 'dsh-tuzi-desktop', productName: brand.name, main: 'lib/community-entry.js', dshCommunityVersion: communityRelease.version } : {}),
       dshDesktopAppId: appId,
       dshDesktopUpdateChannel: update?.channel ?? 'nightly',
       ...(policy === undefined ? {} : { dshMandatoryUpdatePolicy: policy }),

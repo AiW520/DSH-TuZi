@@ -1,6 +1,7 @@
 import React from 'react'
 import mark from '../../apps/desktop/resources/community-mark.svg'
 import { PetToggle } from './pet-toggle.jsx'
+import { UpdatePanel } from './update-panel.jsx'
 
 export const inject = ['slots']
 
@@ -13,6 +14,8 @@ function Name() {
 }
 
 export function apply(ctx) {
+  ctx.slots.inject('sidebar.footer.action', () =>
+    ctx.slots.register({ name: 'sidebar.footer.action', id: 'community-updates' }, UpdatePanel))
   ctx.slots.inject('sidebar.footer.action', () =>
     ctx.slots.register({ name: 'sidebar.footer.action', id: 'cloud-bunny-toggle' }, PetToggle))
   ctx.slots.inject('sidebar.brand.mark', () =>

@@ -6,6 +6,8 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { COMMUNITY_DESKTOP, DESKTOP_BRAND } from './community-brand.ts'
+import { CommunityUpdates, communityInstalledVersion } from './community-updates.ts'
+import { COMMUNITY_UPDATE_IPC } from './community-update-protocol.ts'
 import { fileURLToPath } from 'node:url'
 import {
   app,
@@ -419,7 +421,7 @@ async function main(): Promise<void> {
   // chrome and its content never mix languages.
   const showAbout = async (): Promise<void> => {
     await ordinaryMessageBox({ type: 'info', title: locale.messages.aboutMenu, message: locale.messages.aboutProduct,
-      detail: formatDesktopMessage(locale.messages.aboutVersion, { version: app.getVersion() }),
+      detail: formatDesktopMessage(locale.messages.aboutVersion, { version: communityUpdates?.state.currentVersion || app.getVersion() }),
       buttons: [locale.messages.updateAcknowledge], cancelId: 0 })
   }
   const commandManager = new DesktopCommandManager({
@@ -678,12 +680,37 @@ async function main(): Promise<void> {
       }
       return true
     },
-    undefined, undefined, undefined,
+    undefined, COMMUNITY_DESKTOP ? () => false : undefined, undefined,
     (success, reason) => { void track('desktop_upgrade_download_result', { is_success: success, ...reason === undefined ? {} : { error_reason: reason } }) },
     updateChannel,
   )
 
   const updateSchedule = new DesktopUpdateSchedule(updates, resolveDesktopUpdateScheduleConfig(process.env))
+  const communityUpdates = COMMUNITY_DESKTOP ? new CommunityUpdates({
+    version: communityInstalledVersion(manifest),
+    platform: process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux',
+    arch: process.arch,
+    preferencesPath: join(app.getPath('userData'), 'community-update-preferences.json'),
+    fetch: (url, options) => net.fetch(url instanceof URL ? url.href : url, options),
+    publish: (state) => {
+      if (mainWindow !== undefined && !mainWindow.isDestroyed()) mainWindow.webContents.send(COMMUNITY_UPDATE_IPC.changed, state)
+    },
+    openExternal: url => shell.openExternal(url),
+  }) : undefined
+  if (communityUpdates !== undefined) {
+    ipcMain.handle(COMMUNITY_UPDATE_IPC.status, (event) => {
+      assertProductSender(event)
+      return communityUpdates.status()
+    })
+    ipcMain.handle(COMMUNITY_UPDATE_IPC.action, (event, action: unknown, version: unknown) => {
+      assertProductSender(event)
+      if (action !== 'check' && action !== 'later' && action !== 'ignore' && action !== 'download' && action !== 'notes') {
+        throw new Error('Invalid community update action')
+      }
+      if (version !== undefined && typeof version !== 'string') throw new Error('Invalid community update version')
+      return communityUpdates.act(action, version)
+    })
+  }
 
   const downloadUpdate = async (version: string): Promise<DesktopUpdateState> => {
     void track('desktop_upgrade_click', {})
@@ -842,6 +869,11 @@ async function main(): Promise<void> {
   let promptOperation: Promise<void> | undefined
   let policyAuthenticationQueued = false
   const openUpdatePrompt = (manual = false): Promise<void> => {
+    if (communityUpdates !== undefined) {
+      focusPrimaryWindow()
+      communityUpdates.open()
+      return Promise.resolve()
+    }
     if (authenticationOperation !== undefined) {
       policyAuth?.focus(); updateDialog.focus()
     }
@@ -961,12 +993,14 @@ async function main(): Promise<void> {
   }
 
   const automaticCheck = (): void => {
+    if (communityUpdates !== undefined) { if (!quitting) void communityUpdates.check(); return }
     if (!quitting) void mandatoryPolicy?.check('foreground-or-resume').catch((error: unknown) => { console.error(error) })
     if (!quitting) void updateSchedule.check().catch((error: unknown) => { console.error(error) })
   }
   powerMonitor.on('resume', automaticCheck)
   app.on('will-quit', () => {
     updateSchedule.dispose()
+    void communityUpdates?.dispose()
     powerMonitor.off('resume', automaticCheck)
     updates.dispose()
   })
@@ -975,7 +1009,7 @@ async function main(): Promise<void> {
     : join(process.resourcesPath, 'icon.png')
   app.setAboutPanelOptions({
     applicationName: DESKTOP_BRAND.name,
-    applicationVersion: app.getVersion(),
+    applicationVersion: communityInstalledVersion(manifest) ?? app.getVersion(),
     // The release has no separate build number; omit Electron's bundle version.
     version: '',
     copyright: '',
@@ -1300,7 +1334,8 @@ async function main(): Promise<void> {
     updateSchedule.dispose()
     updateDialog.dispose()
     mandatoryUI?.dispose()
-    void Promise.all([Promise.resolve(mandatoryPolicy?.dispose()).then(() => policyAuth?.dispose()), backend.close(),
+    void Promise.all([communityUpdates?.dispose(), backend.close(),
+      Promise.resolve(mandatoryPolicy?.dispose()).then(() => policyAuth?.dispose()),
       // A Platform cleanup failure is logged without cutting the remaining Host shutdown short.
       platformView.dispose().catch((error: unknown) => { console.error(error) }),
       disposeFileDrag().catch((error: unknown) => { console.error(error) })])

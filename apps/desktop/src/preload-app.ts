@@ -2,6 +2,8 @@
 
 import type { DesktopShortcutInput, ShortcutConfigSnapshot, ShortcutSaveResult } from '@deepseek-ai/dsh-client-shortcuts/protocol'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import { COMMUNITY_DESKTOP } from './community-brand.ts'
+import { COMMUNITY_UPDATE_IPC, type CommunityUpdateApi, type CommunityUpdateState } from './community-update-protocol.ts'
 import { DESKTOP_IPC, SCHEME, type DshDesktopProductApi, type DesktopUpdatePresentation } from './ipc.ts'
 import { PLATFORM_IPC } from './platform-ipc.ts'
 import { markDocumentPlatform, syncWindowFullscreen } from './preload-platform.ts'
@@ -116,4 +118,17 @@ if (location.protocol === `${SCHEME}:` && location.hostname === 'app') {
     read: () => ipcRenderer.invoke(DESKTOP_IPC.localeBootstrap),
     onChange: (locale: string) => { ipcRenderer.send(DESKTOP_IPC.localeChanged, locale) },
   })
+}
+
+if (COMMUNITY_DESKTOP && location.protocol === `${SCHEME}:` && location.hostname === 'app' && process.isMainFrame) {
+  const api: CommunityUpdateApi = {
+    status: () => ipcRenderer.invoke(COMMUNITY_UPDATE_IPC.status) as Promise<CommunityUpdateState>,
+    action: (action, version) => ipcRenderer.invoke(COMMUNITY_UPDATE_IPC.action, action, version) as Promise<CommunityUpdateState>,
+    subscribe: (listener) => {
+      const handle = (_event: Electron.IpcRendererEvent, state: CommunityUpdateState): void => { listener(state) }
+      ipcRenderer.on(COMMUNITY_UPDATE_IPC.changed, handle)
+      return () => { ipcRenderer.off(COMMUNITY_UPDATE_IPC.changed, handle) }
+    },
+  }
+  contextBridge.exposeInMainWorld('dshCommunityUpdates', api)
 }

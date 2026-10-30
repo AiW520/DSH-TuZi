@@ -28,6 +28,11 @@ $uninstall = Start-Process -FilePath $uninstallers[0].FullName -ArgumentList @('
 if (-not $uninstall.WaitForExit(180000)) { Stop-Process -Id $uninstall.Id -Force; throw 'Uninstaller timed out.' }
 if ($uninstall.ExitCode -ne 0 -or (Test-Path -LiteralPath $executable)) { throw 'Uninstall did not remove the application.' }
 if (-not (Test-Path -LiteralPath (Join-Path $homeMarker 'keep.txt'))) { throw 'Uninstaller removed the protected community home.' }
+$reports = @(Get-ChildItem -LiteralPath $evidence -Filter 'report.json' -Recurse | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json } | Where-Object { $_.updates.qualified -eq $true })
+if ($reports.Count -ne 1) { throw 'Expected one installed update notification qualification report.' }
+$communityVersion = $reports[0].updates.communityVersion
+$expectedVersion = (Get-Content -LiteralPath 'community/release.json' -Raw | ConvertFrom-Json).version
+if ($communityVersion -ne $expectedVersion) { throw 'Installed community identity differs from the source release.' }
 $hash = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
 "$hash  $($installer.Name)" | Set-Content -Encoding utf8 (Join-Path $artifacts 'SHA256SUMS.txt')
-@{ schemaVersion = 1; qualified = $true; platform = 'Windows'; arch = 'x64'; sourceCommit = $env:GITHUB_SHA; runId = $env:GITHUB_RUN_ID; artifact = $installer.Name; bytes = $installer.Length; sha256 = $hash; signing = 'unsigned-test'; tests = @('NSIS silent installation', 'installed Harness sessions and task states', 'installed desktop pet interactions', 'uninstall preserves community home') } | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 (Join-Path $artifacts 'qualification.json')
+@{ schemaVersion = 1; qualified = $true; communityVersion = $communityVersion; platform = 'Windows'; arch = 'x64'; sourceCommit = $env:GITHUB_SHA; runId = $env:GITHUB_RUN_ID; artifact = $installer.Name; bytes = $installer.Length; sha256 = $hash; signing = 'unsigned-test'; tests = @('NSIS silent installation', 'installed Harness sessions and task states', 'installed desktop pet interactions', 'uninstall preserves community home', 'installed update notifications') } | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 (Join-Path $artifacts 'qualification.json')

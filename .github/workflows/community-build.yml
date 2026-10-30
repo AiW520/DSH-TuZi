@@ -34,7 +34,7 @@ jobs:
       - name: Check companion budget and cancellation
         run: node --test community/tests/companion-service.mjs
       - name: Model and desktop regressions
-        run: pnpm exec vitest run packages/llm/llm-pi-ai/tests/discovery.spec.ts packages/llm/llm-pi-ai/tests/adapter.spec.ts packages/client/ui-settings-models/tests/model-list-catalog.client.spec.tsx apps/desktop/tests/community-package.spec.ts apps/desktop/tests/project-manager.spec.ts scripts/client-build-environment.client.spec.ts packages/bundle/web-app/tests/product-analytics.spec.ts
+        run: pnpm exec vitest run packages/llm/llm-pi-ai/tests/discovery.spec.ts packages/llm/llm-pi-ai/tests/adapter.spec.ts packages/client/ui-settings-models/tests/model-list-catalog.client.spec.tsx apps/desktop/tests/community-package.spec.ts apps/desktop/tests/community-updates.spec.ts apps/desktop/tests/project-manager.spec.ts scripts/client-build-environment.client.spec.ts packages/bundle/web-app/tests/product-analytics.spec.ts
       - name: Build unsigned Apple Silicon qualification package
         run: pnpm run package:desktop:mac:arm64:unsigned
       - name: Record artifact checksum
@@ -79,7 +79,7 @@ jobs:
       - name: Check companion budget and cancellation
         run: node --test community/tests/companion-service.mjs
       - name: Community packaging regressions
-        run: pnpm exec vitest run apps/desktop/tests/community-package.spec.ts
+        run: pnpm exec vitest run apps/desktop/tests/community-package.spec.ts apps/desktop/tests/community-updates.spec.ts
       - name: Configure unsigned community packaging
         run: |
           @'

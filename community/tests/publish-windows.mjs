@@ -14,11 +14,11 @@ fs.appendFileSync('calls.jsonl',JSON.stringify(a)+'\\n');
 const artifact='dsh-tuzi-0.2.1-rc.3-win-x64-unsigned.exe', bytes=Buffer.from('MZqualification fixture');
 const sha=crypto.createHash('sha256').update(bytes).digest('hex');
 if(a[0]==='api' && a[1].includes('/actions/runs/')) console.log(JSON.stringify({conclusion:mode==='failed-run'?'failure':'success',path:'.github/workflows/community-build.yml',head_branch:'main',head_sha:'abc',head_repository:{full_name:'AiW520/DSH-TuZi'},html_url:'https://github.com/AiW520/DSH-TuZi/actions/runs/123'}));
-else if(a[0]==='run') { const d=a[a.indexOf('--dir')+1];fs.mkdirSync(d,{recursive:true});fs.writeFileSync(path.join(d,artifact),bytes);fs.writeFileSync(path.join(d,'qualification.json'),JSON.stringify({schemaVersion:1,qualified:true,sourceCommit:mode==='wrong-source'?'def':'abc',runId:'123',platform:'Windows',arch:'x64',signing:'unsigned-test',artifact,bytes:bytes.length,sha256:mode==='wrong-digest'?'0'.repeat(64):sha,tests:mode==='missing-tests'?[]:['NSIS silent installation','installed Harness sessions and task states','installed desktop pet interactions','uninstall preserves community home']})); }
+else if(a[0]==='run') { const d=a[a.indexOf('--dir')+1];fs.mkdirSync(d,{recursive:true});fs.writeFileSync(path.join(d,artifact),bytes);fs.writeFileSync(path.join(d,'qualification.json'),JSON.stringify({schemaVersion:1,qualified:true,communityVersion:mode==='wrong-community-version'?'0.2.1-rc.3-community.2':'0.2.1-rc.3-community.3',sourceCommit:mode==='wrong-source'?'def':'abc',runId:'123',platform:'Windows',arch:'x64',signing:'unsigned-test',artifact,bytes:bytes.length,sha256:mode==='wrong-digest'?'0'.repeat(64):sha,tests:mode==='missing-tests'?[]:['NSIS silent installation','installed Harness sessions and task states','installed desktop pet interactions','uninstall preserves community home','installed update notifications']})); }
 else if(a[0]==='api' && a[1].endsWith('/releases')) console.log(JSON.stringify([{tag_name:'v0.2.1-rc.3-community.3',draft:true,assets:[{name:artifact,state:'uploaded',size:bytes.length,digest:'sha256:'+(mode==='upload-mismatch'?'0'.repeat(64):sha)}]}]));
 else if(a[0]!=='release') process.exit(7);
 `;
-for (const mode of ['success', 'failed-run', 'wrong-source', 'wrong-digest', 'missing-tests', 'wrong-release-version', 'upload-mismatch']) {
+for (const mode of ['success', 'failed-run', 'wrong-source', 'wrong-digest', 'missing-tests', 'wrong-release-version', 'wrong-community-version', 'upload-mismatch']) {
   test(`publish Windows: ${mode}`, { skip: process.platform === 'win32' ? 'Publisher runs on the Unix release runner' : false }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-publish-test-'));
     try {

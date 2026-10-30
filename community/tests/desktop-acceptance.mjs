@@ -1,3 +1,4 @@
+import { qualifyInstalledUpdates } from './installed-updates.mjs';
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { mkdir, writeFile, mkdtemp, readFile } from "node:fs/promises";
@@ -77,6 +78,7 @@ try {
   page.on("pageerror", (e) => errors.push(e.message));
   await page.waitForFunction(() => /新会话|New session/i.test(document.body.innerText), {}, { timeout: 6e4 });
   assert.match(await page.locator("body").innerText(), /DSH-TuZi/);
+  const updates = await qualifyInstalledUpdates(app, page, root);
   await page.addInitScript(() => {
     Object.defineProperty(globalThis, "__ModuleLoader__", { configurable: true, set(target) {
       Object.defineProperty(globalThis, "__ModuleLoader__", { configurable: true, writable: true, value: target });
@@ -183,7 +185,7 @@ try {
   await waitState(null);
   assert.deepEqual(errors, []);
   await page.screenshot({ path: root + "/app.png" });
-  await writeFile(root + "/report.json", JSON.stringify({ requests, states, errors }, null, 2));
+  await writeFile(root + "/report.json", JSON.stringify({ requests, states, errors, updates }, null, 2));
   console.log("PASS installed app, community branding, real Harness tool execution, thinking/working/success/error/waiting/cancellation; no renderer errors.");
 } finally {
   if (app) await app.close();
