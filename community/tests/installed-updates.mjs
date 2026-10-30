@@ -5,9 +5,9 @@ import { readFile } from 'node:fs/promises';
 export async function qualifyInstalledUpdates(app, page, output) {
   const expected = JSON.parse(await readFile(new URL('../release.json', import.meta.url), 'utf8')).version;
   const identity = await app.evaluate(async ({ app }) => {
-    const { readFile } = await import('node:fs/promises');
+    const { readFile } = process.getBuiltinModule('node:fs/promises');
     const manifest = JSON.parse(await readFile(app.getAppPath() + '/package.json', 'utf8'));
-    const { createRequire } = await import('node:module');
+    const { createRequire } = process.getBuiltinModule('node:module');
     const updater = createRequire(app.getAppPath() + '/package.json')('electron-updater').autoUpdater;
     if (updater.autoDownload !== false || updater.autoInstallOnAppQuit !== false) throw new Error('Automatic installation must be disabled');
     return { version: manifest.dshCommunityVersion, arch: process.arch, platform: process.platform };
@@ -51,7 +51,7 @@ export async function qualifyInstalledUpdates(app, page, output) {
     await page.keyboard.press('Escape');
     await page.evaluate(version => window.dshCommunityUpdates.action('ignore', version), version);
     const saved = await app.evaluate(async ({ app }) => {
-      const { readFile } = await import('node:fs/promises');
+      const { readFile } = process.getBuiltinModule('node:fs/promises');
       return JSON.parse(await readFile(app.getPath('userData') + '/community-update-preferences.json', 'utf8'));
     });
     assert.equal(saved.ignored, version);
