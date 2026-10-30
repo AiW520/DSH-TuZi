@@ -66,7 +66,9 @@ export async function qualifyInstalledUpdates(app, page, output) {
     });
     await page.getByRole('dialog').waitFor();
     await page.getByRole('status').filter({ hasText: /无法检查|Could not check/ }).waitFor();
+    await page.waitForFunction(async () => (await window.dshCommunityUpdates.status()).openRequest === 0);
     await page.keyboard.press('Escape');
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
     return { communityVersion: expected, platform: identity.platform, arch: identity.arch, qualified: true, tests: ['embedded community identity', 'installed update IPC and passive reminder', 'explicit platform download', 'persistent snooze and ignore', 'quiet network failure'] };
   } finally { await app.evaluate(() => { globalThis.__updateQualification.restore(); delete globalThis.__updateQualification; }); }
 }

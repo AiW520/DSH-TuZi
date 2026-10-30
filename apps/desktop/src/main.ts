@@ -702,13 +702,17 @@ async function main(): Promise<void> {
       assertProductSender(event)
       return communityUpdates.status()
     })
-    ipcMain.handle(COMMUNITY_UPDATE_IPC.action, (event, action: unknown, version: unknown) => {
+    ipcMain.handle(COMMUNITY_UPDATE_IPC.action, (event, action: unknown, version: unknown, openRequest: unknown) => {
       assertProductSender(event)
-      if (action !== 'check' && action !== 'later' && action !== 'ignore' && action !== 'download' && action !== 'notes') {
+      if (action !== 'check' && action !== 'later' && action !== 'ignore'
+        && action !== 'download' && action !== 'notes' && action !== 'acknowledge') {
         throw new Error('Invalid community update action')
       }
       if (version !== undefined && typeof version !== 'string') throw new Error('Invalid community update version')
-      return communityUpdates.act(action, version)
+      if (openRequest !== undefined && (typeof openRequest !== 'number' || !Number.isSafeInteger(openRequest) || openRequest <= 0)) {
+        throw new Error('Invalid community update dialog request')
+      }
+      return communityUpdates.act(action, version, openRequest)
     })
   }
 

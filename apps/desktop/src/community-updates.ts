@@ -92,6 +92,7 @@ export class CommunityUpdates {
   private controller: AbortController | undefined
   private timer: ReturnType<typeof setTimeout> | undefined
   private disposed = false
+  private openSequence = 0
   private failures = 0
   private nextCheck: number
 
@@ -206,17 +207,25 @@ export class CommunityUpdates {
   }
 
   /** Native menu opens the same renderer dialog without interrupting a running task. */
-  open(): void { if (!this.disposed) { this.snapshot.openRequest++; this.emit(); void this.check(true) } }
+  open(): void { if (!this.disposed) { this.snapshot.openRequest = ++this.openSequence; this.emit(); void this.check(true) } }
 
   /** Execute an explicit user action. Download opens a browser; it never installs in-process.
    * @param action - Validated IPC operation.
    * @param version - Required for release-specific actions; omitted for check.
+   * @param openRequest - Request token acknowledged by the renderer; omitted for other operations.
    * @returns State after the operation, or rejects when the selection is stale or saving fails.
    */
-  async act(action: CommunityUpdateAction, version?: string): Promise<CommunityUpdateState> {
+  async act(action: CommunityUpdateAction, version?: string, openRequest?: number): Promise<CommunityUpdateState> {
     await this.ready
     if (this.disposed) throw new Error('Community updates closed')
     if (action === 'check') return this.check(true)
+    if (action === 'acknowledge') {
+      if (openRequest === this.snapshot.openRequest && openRequest !== 0) {
+        this.snapshot.openRequest = 0
+        this.emit()
+      }
+      return this.state
+    }
     const release = this.snapshot.release
     if (release === null || release.version !== version) throw new Error('Community release selection changed')
     if (action === 'download' || action === 'notes') {

@@ -6,7 +6,7 @@ export const COMMUNITY_UPDATE_IPC = {
 } as const
 
 /** User-selected operations; versioned actions reject stale selections. */
-export type CommunityUpdateAction = 'check' | 'later' | 'ignore' | 'download' | 'notes'
+export type CommunityUpdateAction = 'check' | 'later' | 'ignore' | 'download' | 'notes' | 'acknowledge'
 
 /** A qualified installer matching this running application's OS and architecture. */
 export interface CommunityRelease {
@@ -36,6 +36,6 @@ export interface CommunityUpdateState {
 /** Optional preload bridge, present only in the community desktop's trusted main frame. */
 export interface CommunityUpdateApi {
   status(): Promise<CommunityUpdateState>
-  action(action: CommunityUpdateAction, version?: string): Promise<CommunityUpdateState>
+  action(action: CommunityUpdateAction, version?: string, openRequest?: number): Promise<CommunityUpdateState>
   subscribe(listener: (state: CommunityUpdateState) => void): () => void
 }

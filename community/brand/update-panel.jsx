@@ -24,7 +24,11 @@ export function UpdatePanel() {
       if (generation.current !== epoch || value.revision < revision.current) return
       revision.current = value.revision
       setState(value)
-      if (value.openRequest > requested.current) { requested.current = value.openRequest; setOpen(true) }
+      if (value.openRequest > requested.current) {
+        requested.current = value.openRequest; setOpen(true)
+        // Consume the native menu request once, including across renderer reloads.
+        api.action('acknowledge', undefined, value.openRequest).catch(() => { if (generation.current === epoch) setError(true) })
+      }
     }
     const off = api.subscribe(receive)
     api.status().then(receive).catch(() => { if (generation.current === epoch) setError(true) })

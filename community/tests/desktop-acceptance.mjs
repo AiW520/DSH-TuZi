@@ -97,6 +97,7 @@ try {
     } });
   });
   await page.reload();
+  assert.equal(await page.locator('dialog[aria-labelledby="community-update-title"]').count(), 0, 'consumed native menu request must not reopen after reload');
   await page.waitForFunction(() => globalThis.__acceptCtx?.get("sessions"), {}, { timeout: 6e4 });
   await page.evaluate(() => globalThis.__acceptCtx.loader.await());
   const session = await page.evaluate((cwd) => globalThis.__acceptCtx.sessions.create({ cwd }), join(root, "workspace"));
@@ -116,6 +117,7 @@ try {
   await page.getByRole('button', { name: /开启桌面云朵兔|Show desktop bunny/ }).waitFor();
   assert.equal(await visibility(), 'none', 'sidebar switch must persist hidden state');
   await page.reload();
+  assert.equal(await page.locator('dialog[aria-labelledby="community-update-title"]').count(), 0, 'consumed native menu request must not reopen after reload');
   await page.getByRole('button', { name: /开启桌面云朵兔|Show desktop bunny/ }).waitFor({ timeout: 30000 });
   await page.getByRole('button', { name: /开启桌面云朵兔|Show desktop bunny/ }).click();
   await page.getByRole('button', { name: /关闭桌面云朵兔|Hide desktop bunny/ }).waitFor();

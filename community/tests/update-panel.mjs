@@ -27,7 +27,7 @@ try {
     window.dshCommunityUpdates = {
       status: async () => ({ ...window.updateState }),
       subscribe: cb => { listeners.add(cb); return () => listeners.delete(cb); },
-      action: async (action, version) => { window.calls.push({ action, version }); if (window.failAction) throw new Error('disk unavailable'); if (action === 'later') window.emitUpdate({ suppressed: 'snoozed' }); if (action === 'ignore') window.emitUpdate({ suppressed: 'ignored' }); return { ...window.updateState }; },
+      action: async (action, version, request) => { window.calls.push({ action, version }); if (window.failAction) throw new Error('disk unavailable'); if (action === 'acknowledge' && request === window.updateState.openRequest) window.emitUpdate({ openRequest: 0 }); if (action === 'later') window.emitUpdate({ suppressed: 'snoozed' }); if (action === 'ignore') window.emitUpdate({ suppressed: 'ignored' }); return { ...window.updateState }; },
     };
     window.listenerCount = () => listeners.size;
   });
@@ -59,6 +59,7 @@ try {
   await page.keyboard.press('Escape');
   await page.evaluate(() => window.emitUpdate({ openRequest: 1 }));
   await page.getByRole('dialog').waitFor();
+  await page.waitForFunction(() => window.updateState.openRequest === 0);
   await page.evaluate(() => document.documentElement.lang = 'en');
   await page.getByRole('button', { name: 'Close update details' }).click();
   await page.evaluate(() => window.emitUpdate({ phase: 'error', release: null }));

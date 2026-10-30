@@ -75,6 +75,17 @@ describe('community notification lifecycle', () => {
     expect(notifier.state.phase).toBe('available')
     expect(options.openExternal).not.toHaveBeenCalled()
   })
+  it('consumes native menu requests once and preserves a newer request against a stale acknowledgement', async () => {
+    const notifier = create()
+    notifier.open(); await notifier.check(true)
+    const first = notifier.state.openRequest
+    notifier.open(); await notifier.check(true)
+    const second = notifier.state.openRequest
+    await notifier.act('acknowledge', undefined, first)
+    expect(notifier.state.openRequest).toBe(second)
+    await notifier.act('acknowledge', undefined, second)
+    expect((await notifier.status()).openRequest).toBe(0)
+  })
   it('persists ignore across restart, reveals it manually, and announces a newer version', async () => {
     const first = create()
     await first.check(true)

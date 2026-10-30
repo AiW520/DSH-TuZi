@@ -123,7 +123,8 @@ if (location.protocol === `${SCHEME}:` && location.hostname === 'app') {
 if (COMMUNITY_DESKTOP && location.protocol === `${SCHEME}:` && location.hostname === 'app' && process.isMainFrame) {
   const api: CommunityUpdateApi = {
     status: () => ipcRenderer.invoke(COMMUNITY_UPDATE_IPC.status) as Promise<CommunityUpdateState>,
-    action: (action, version) => ipcRenderer.invoke(COMMUNITY_UPDATE_IPC.action, action, version) as Promise<CommunityUpdateState>,
+    action: (action, version, openRequest) =>
+      ipcRenderer.invoke(COMMUNITY_UPDATE_IPC.action, action, version, openRequest) as Promise<CommunityUpdateState>,
     subscribe: (listener) => {
       const handle = (_event: Electron.IpcRendererEvent, state: CommunityUpdateState): void => { listener(state) }
       ipcRenderer.on(COMMUNITY_UPDATE_IPC.changed, handle)
