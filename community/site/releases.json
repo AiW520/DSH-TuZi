@@ -14,12 +14,12 @@
     {
       "platform": "macOS",
       "arch": "arm64",
-      "version": "0.2.1-rc.3-community.2",
-      "bytes": 268525279,
-      "sha256": "1e4ce8e023d6c33336ff947a12dfd4cb90878b7da01a8adf48a2f16c621d7afc",
+      "version": "0.2.1-rc.3-community.5",
+      "bytes": 269543761,
+      "sha256": "5418affa94f8fb4480a8e9eac8055206245eecfcfaaf2912903554e426340e5b",
       "signing": "unsigned-test",
       "qualified": true,
-      "url": "https://github.com/AiW520/DSH-TuZi/releases/download/v0.2.1-rc.3-community.2/dsh-tuzi-0.2.1-rc.3-mac-arm64-unsigned.dmg"
+      "url": "https://github.com/AiW520/DSH-TuZi/releases/download/v0.2.1-rc.3-community.5/dsh-tuzi-0.2.1-rc.3-mac-arm64-unsigned.dmg"
     }
   ]
 }
