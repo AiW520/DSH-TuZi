@@ -4,22 +4,24 @@
     {
       "platform": "Windows",
       "arch": "x64",
-      "version": "0.2.1-rc.3-community.5",
-      "bytes": 315595733,
-      "sha256": "045dde2b61d3e8e2bec5d9025b42e7374e2859f13e6cf0a318f4b02d6ed4120c",
+      "bytes": 315448426,
+      "sha256": "fa319b03510cd9ccaff5c41836066a2fd4abda52d4b5c2e384d127c75ff47f45",
       "signing": "unsigned-test",
       "qualified": true,
-      "url": "https://github.com/AiW520/DSH-TuZi/releases/download/v0.2.1-rc.3-community.5/dsh-tuzi-0.2.1-rc.3-win-x64-unsigned.exe"
+      "version": "0.2.1-rc.3-community.6",
+      "url": "https://github.com/AiW520/DSH-TuZi/releases/download/v0.2.1-rc.3-community.6/dsh-tuzi-0.2.1-rc.3-win-x64-unsigned.exe",
+      "notes": "本版仅检查和提醒，不会自动下载安装或重启。支持手动检查、24 小时后提醒、忽略本版。修复跨上游版本比较、重载重复提醒，以及云朵兔动作切换被旧视频打断的问题。旧版需要手动升级一次。"
     },
     {
       "platform": "macOS",
       "arch": "arm64",
-      "version": "0.2.1-rc.3-community.5",
-      "bytes": 269543761,
-      "sha256": "5418affa94f8fb4480a8e9eac8055206245eecfcfaaf2912903554e426340e5b",
+      "bytes": 269207875,
+      "sha256": "b0704cd1130e1134f600bad71fd4375f5f7f79fb5db35eb4931725f00dd9b266",
       "signing": "unsigned-test",
       "qualified": true,
-      "url": "https://github.com/AiW520/DSH-TuZi/releases/download/v0.2.1-rc.3-community.5/dsh-tuzi-0.2.1-rc.3-mac-arm64-unsigned.dmg"
+      "version": "0.2.1-rc.3-community.6",
+      "url": "https://github.com/AiW520/DSH-TuZi/releases/download/v0.2.1-rc.3-community.6/dsh-tuzi-0.2.1-rc.3-mac-arm64-unsigned.dmg",
+      "notes": "本版仅检查和提醒，不会自动下载安装或重启。支持手动检查、24 小时后提醒、忽略本版。修复跨上游版本比较、重载重复提醒，以及云朵兔动作切换被旧视频打断的问题。旧版需要手动升级一次。"
     }
   ]
 }
